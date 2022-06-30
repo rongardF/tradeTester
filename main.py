@@ -1,5 +1,4 @@
 '''
-
 '''
 import threading
 import backtrader as bt
@@ -8,10 +7,9 @@ import time
 from datetime import datetime as dt
 from tvDatafeed import Interval
 
-from tvDatafeed.tvDatafeedRealtime import tvDatafeedRealtime as tdr
-from strategyRunner.strategyRunner import strategyRunner as strategy_runner
-from SQL.sqlManager import sqlManager, testruns, orders, operations, packet
-from controller.controller import controller
+from livetrader.orders import orders
+from livetrader.sqlManager import operations, packet
+from livetrader.controller import controller
 
 def terminal(queue):
     while True:
@@ -41,21 +39,23 @@ class MyStrategy(bt.Strategy):
             self.order=self.orders.new_order(str(dt.now().strftime("%d-%m-%y %H:%M")), "B/S", self.data.open[0], 100.0, 90.0, 110.0, 10000.0)
             pack=packet(operations.open_order, self.order.TUID, self.order)
             self.p.sql_input.put(pack)
-        
-    def notify_data(self, data, status, *args, **kwargs):
-        if status == data.LIVE:
-            print("live data")
-        elif status == data.DELAYED:
-            print("DELAYED data")
 
 if __name__ == "__main__":
     contr=controller()
     #contr.start()
-    contr.add_testrun("test_strat11", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000) # strategy name must be unique and orders for that testrun must be removed from DB before running
+    tuid1=contr.start_testrun("myTest1", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000) # strategy name must be unique and orders for that testrun must be removed from DB before running
+    tuid2=contr.start_testrun("myTest2", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000)
+    tuid3=contr.start_testrun("myTest3", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_3_minute, 10000)
+    contr.select_testrun(tuid1)
     t=threading.Thread(target=terminal, args=(contr.sql_output,))
+    t.start()
     print("Thread started, waiting...")
-    time.sleep(130)
+    time.sleep(120)
+    testrun_list=contr.get_testruns()
+    print(testrun_list)
     print("Deleting testrun")
-    contr.del_testrun("test_strat11")
+    contr.stop_testrun(tuid1)
+    contr.stop_testrun(tuid2)
+    contr.stop_testrun(tuid3)
     print("Waiting...")
     time.sleep(300)

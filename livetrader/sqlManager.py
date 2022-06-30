@@ -5,144 +5,6 @@ import sqlite3, threading, queue
 from datetime import datetime as dt
 from enum import Enum
 
-class orders(object):
-    
-    def __init__(self, TUID, order_id_starting=0): # user can specify the starting value for order_id (incase we are going from backtest to forward test)
-        self.order_id=order_id_starting
-        self.TUID=TUID
-    
-    def __next__(self):
-        new_order_id=self.order_id
-        self.order_id += 1
-        return new_order_id
-    
-    def new_order(self, open_datetime, order_type, entry_price, position_size, stop_loss_price, take_profit_price, open_account_size): 
-        new_order_id=self.__next__()  
-        new_order=order(new_order_id, self.TUID, open_datetime, order_type, entry_price, position_size, stop_loss_price, \
-                        take_profit_price, open_account_size)
-        
-        return new_order
-        
-class order(object):
-    
-    def __init__(self, order_id, TUID, open_datetime, order_type, entry_price, position_size, stop_loss_price, \
-                 take_profit_price, open_account_size):
-        self.order_id=order_id # this must be iterator and is automatically iterated
-        self.TUID=TUID
-        self.state="OPEN" # maybe we can use enumerator here?
-        self.open_datetime=open_datetime # this will be datetime type
-        self.close_datetime="NULL"
-        self.order_type=order_type
-        self.entry_price=entry_price
-        self.close_price="NULL"
-        self.position_size=position_size
-        self.stop_loss_price=stop_loss_price
-        self.take_profit_price=take_profit_price
-        self.open_account_size=open_account_size
-        self.close_account_size="NULL"
-    
-    def close_order(self, close_datetime, close_price, close_account_size):
-        self.close_datetime=close_datetime
-        self.close_price=close_price
-        self.close_account_size=close_account_size
-        self.state="CLOSED"
-    
-    def get_sql_params(self): # this method returns a valid SQL parameters tuple
-        if self.state == "OPEN":
-            return (self.order_id, self.TUID, self.state, self.open_datetime, self.close_datetime, \
-                    self.order_type, self.entry_price, self.close_price, self.position_size, self.stop_loss_price, \
-                    self.take_profit_price, self.open_account_size, self.close_account_size)
-        else:
-            return (self.state, self.close_datetime, self.close_price, self.close_account_size, self.TUID, self.order_id)
-    
-    def get_id(self):
-        return self.TUID
-
-class testruns(object):
-    
-    def __init__(self, data_collector): # user can specify the starting value for order_id (incase we are going from backtest to forward test)
-        self.data_collector=data_collector
-        self.testruns_dict={}
-    
-    def __is_name_unique(self, name): # check that we do not have a testrun/strategy with this name in the dictionary
-        for testruns_list in self.testruns_dict.values():
-            # if name in strat_names_list:
-            #     return False
-            for testrun in testruns_list:
-                if name == testrun.strategy_name:
-                    return False
-        return True
-            
-    def remove_testrun(self, asset_id, testrun):
-        self.testruns_dict[asset_id].remove(testrun)
-        if len(self.testruns_dict[asset_id]) == 0: # no more strategies using this asset set
-            self.data_collector.del_symbol(asset_id) # remove this asset from data_collector monitor list - THIS WILL BE DONE IN STRATEGYRUNNER INSTEAD?
-            self.testruns_dict.pop(asset_id) # remove asset set from dictionary cause now such asset set under monitor anymore
-    
-    def new_testrun(self, strategy_name, symbol, exchange, interval, account_size):  
-        if self.__is_name_unique(strategy_name):
-            asset_id=self.data_collector.add_symbol(symbol, exchange, interval)
-            new_testrun=testrun(strategy_name, dt.now().strftime("%d-%m-%y %H:%M"), symbol, exchange, str(interval), asset_id, account_size, self.remove_testrun) # opposite operation is datetime_obj=dt.strptime(start_dt_str,"%d-%m-%y %H:%M")
-            if asset_id in self.testruns_dict.keys(): # if already existing then just append
-                self.testruns_dict[asset_id].append(new_testrun)
-            else: # need to create a new key-value pair and add it into new list
-                self.testruns_dict[asset_id]=[new_testrun]
-        else:
-            raise ValueError("Strategy with this name already running") 
-        
-        return new_testrun
-    
-    def get_testrun(self, strat_name):
-        for testruns_list in self.testruns_dict.values():
-            for testrun in testruns_list:
-                if strat_name == testrun.strategy_name:
-                    return testrun
-
-# TODO: move testruns, testrun, orders, order etc. into strategyRunner module
-class testrun(object):
-    
-    def __init__(self, strategy_name, start_datetime, symbol, exchange, interval, asset_id, starting_account, close_callback):
-        self.TUID=None
-        self.strategy_name=strategy_name
-        self.state="OPEN"
-        self.start_datetime=start_datetime
-        self.close_datetime="NULL"
-        self.symbol=symbol
-        self.exchange=exchange
-        self.interval=interval
-        self.asset_id=asset_id
-        self.starting_account=starting_account
-        self.closing_account="NULL"
-        self.close_callback=close_callback
-        self.strat_ref=None
-    
-    def close_testrun(self):
-        self.state="CLOSED"
-        self.close_datetime=dt.now().strftime("%d-%m-%y %H:%M")
-        self.close_callback(self.asset_id, self)
-    
-    def get_sql_params(self):
-        if self.state == "OPEN":
-            return (self.strategy_name, self.state, self.start_datetime, self.close_datetime, self.symbol, \
-                    self.exchange, self.interval, self.starting_account, self.closing_account)
-        else:
-            return (self.state, self.close_datetime, self.TUID)
-    
-    def set_TUID(self, TUID):
-        self.TUID=TUID
-    
-    def get_TUID(self):
-        return self.TUID
-    
-    def get_asset_id(self):
-        return self.asset_id
-    
-    def add_strat_ref(self, ref):
-        self.strat_ref=ref
-        
-    def get_strat_ref(self):
-        return self.strat_ref
-
 class operations(Enum):
     open_order=1
     close_order=2
@@ -190,7 +52,7 @@ class sqlDatabase(object):
         
     def _query_create_tables(self):
         self.db_cursor.execute("CREATE TABLE testruns (TUID INTEGER PRIMARY KEY, \
-                                                        strategy_name TEXT NOT NULL, \
+                                                        name TEXT NOT NULL, \
                                                         state TEXT NOT NULL, \
                                                         start_datetime TEXT NOT NULL, \
                                                         close_datetime TEXT, \
@@ -222,7 +84,7 @@ class sqlDatabase(object):
         self.db_cursor.execute("INSERT INTO testruns VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)", testrun_data) # testrun_data must be a tuple
         self.db_con.commit()
         # get the auto-incremented TUID value
-        self.db_cursor.execute("SELECT * FROM testruns WHERE strategy_name = ?", (testrun_data[0],))
+        self.db_cursor.execute("SELECT * FROM testruns WHERE name = ?", (testrun_data[0],))
         return self.db_cursor.fetchall()[0][0] # fetchall returns a list of tuples; we select the first element from the first tuple
     
     def query_insert_order(self, order_data):
@@ -254,15 +116,17 @@ class sqlDatabase(object):
     
 class sqlManager(threading.Thread):
 
-    def __init__(self):
+    def __init__(self, database_path=None):
         '''
         Constructor
         '''
-        self.database=sqlDatabase(r"C:\Users\User\Documents\Projektid\Python\tradeTester\development_materials\test_db.db") # user should be able to provide the path for this ???
+        if database_path is None:
+            raise ValueError("No path for SQL database provided")
+        self.database=sqlDatabase(database_path) # user should be able to provide the path for this ???
         threading.Thread.__init__(self)
         self.run_mode=threading.Event()
         self.run_mode.set() # until this event is cleared we will run this thread
-        self.active_listen=None
+        self.active_listen=[None,None] # must be a list of Nones because we are checking fro both TUID and asset_id
         self.lock=threading.Lock()
         self.input_queue=queue.Queue() # all strategies and data collector will place their data onto this queue for manager to process
         self.output_queue=queue.Queue() # this will go to GUI for sending data streams
@@ -319,14 +183,16 @@ class sqlManager(threading.Thread):
         self.get_lock()
         self.database.query_update_testrun(sql_params)
         if TUID in self.active_listen: # if we were forwarding data for this testrun then stop
-            self.active_listen=None
+            self.active_listen=[None,None]
         self.drop_lock()
     
     # write this as a direct method called by controller
     def read_testruns(self): # this function returns all the orders which are newly added
+        self.get_lock()
         testruns=self.database.query_read_testruns()
-        testruns_packet=packet(operations.read_testruns, testruns)
-        self.output_queue.put(testruns_packet) # send the packet to GUI
+        self.drop_lock()
+        
+        return testruns
     
     # write this as a direct method called by controller
     def read_orders(self, sender, TUID): # this function returns all the orders which are newly added

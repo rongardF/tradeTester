@@ -1,5 +1,4 @@
 '''
-TODO:
 '''
 
 import threading
@@ -27,7 +26,7 @@ class strategyRunner(threading.Thread):
             self.cerebro.run()
         except Exception as e: # notify the caller about this strategy thread failing with exception e and close
             self.live_feed.remove_callback()
-            self.callback_func(e)
+            self.callback_func(e, self.TUID)
         
     def stop(self):
         self.live_feed.remove_callback() # first remove callback from data_collector - then we can be sure that nothing else is calling receive_data() method
