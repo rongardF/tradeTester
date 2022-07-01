@@ -41,7 +41,7 @@ class MyStrategy(bt.Strategy):
             self.p.sql_input.put(pack)
 
 if __name__ == "__main__":
-    contr=controller()
+    contr=controller(r"C:\Users\User\Documents\Projektid\Python\tradeTester\development_materials\test0_db.db")
     #contr.start()
     tuid1=contr.start_testrun("myTest1", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000) # strategy name must be unique and orders for that testrun must be removed from DB before running
     tuid2=contr.start_testrun("myTest2", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000)
