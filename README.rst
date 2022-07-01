@@ -1,170 +1,80 @@
-backtrader
+Description
 ==========
 
-.. image:: https://img.shields.io/pypi/v/backtrader.svg
-   :alt: PyPi Version
-   :scale: 100%
-   :target: https://pypi.python.org/pypi/backtrader/
+TradeTester is a tool to test various trading strategies both on historic 
+data and on live data streams. Tool uses `backtrader <https://www.backtrader.com/>`_ to provide the comprehensive 
+testing environment and `tvDatafeed <https://pypi.org/project/tvdatafeed/>`_ to easily (and without charge) retrieve both 
+historic and live ticker data from `TradingView <https://www.tradingview.com/>`_ platform.
 
-..  .. image:: https://img.shields.io/pypi/dm/backtrader.svg
-       :alt: PyPi Monthly Donwloads
-       :scale: 100%
-       :target: https://pypi.python.org/pypi/backtrader/
+TradeTester is provides controller through which user can create and manage testruns. 
+Testruns are essentially separate threads executing backtrader (cerebro) with user specified
+strategy. Strategy is executed on live ticker data which is retrieved from TradingView. Live
+data is retrieved using modified tvDatafeed code base which, instead of retrieving historic
+data, monitors specified assets for new data and once it is released retrieves it and feeds
+into testruns (Cerebros running stratgies). 
 
-.. image:: https://img.shields.io/pypi/l/backtrader.svg
-   :alt: License
-   :scale: 100%
-   :target: https://github.com/backtrader/backtrader/blob/master/LICENSE
-.. image:: https://travis-ci.org/backtrader/backtrader.png?branch=master
-   :alt: Travis-ci Build Status
-   :scale: 100%
-   :target: https://travis-ci.org/backtrader/backtrader
-.. image:: https://img.shields.io/pypi/pyversions/backtrader.svg
-   :alt: Python versions
-   :scale: 100%
-   :target: https://pypi.python.org/pypi/backtrader/
+The data IS NOT LIVE in the sense that it has a delay. TradeTester is not intended to perform
+automated trading, but is visioned to perform automated stratgy testing and (in hoepfully in
+the future) ranking different stragies in real-time based on some metrics.
 
-**Yahoo API Note**:
+Features
+==========
 
-  [2018-11-16] After some testing it would seem that data downloads can be
-  again relied upon over the web interface (or API ``v7``)
+TradeTester is still in development as of now, but following features have been
+implmented (but not fully tested):
 
-**Tickets**
+- Basic SQL database (on local machine) to save all the orders and testruns
+- Retrieving live ticker data from TradingView using tvDatafeed
+- Running separate backtrader strategies in thread concurrently (testruns)
+- Simple controller module to start and stop running new strategies in a single
+  TradeTester application (don't need to run multiple backtrader scripts to test
+  multiple stratgies)
+	  
+Features that are planned to add in the future:
 
-  The ticket system is (was, actually) more often than not abused to ask for
-  advice about samples.
+- GUI through which user can add strategies that they want to test and also see
+  live statistics and ticker/order data about running stratgies. Vision is to have
+  some metrics which will quickly show which stratgies is most successful and there
+  will be a ranking based on that
+- Seamless transition from backtesting (historic data) to live testing (on data live 
+  streams). Currently the backtesting part must be done separtly and TradeTester only 
+  support live testing.
+	
+How to use
+==========
 
-For **feedback/questions/...** use the `Community <https://community.backtrader.com>`_
+	Currently the main.py acts as a testbench and an example code. In the future (once GUI
+	is added) this will change and it will act as a boot up module.
 
-Here a snippet of a Simple Moving Average CrossOver. It can be done in several
-different ways. Use the docs (and examples) Luke!
+The controller module is meant to act as a central controller through which user can add
+and manage testruns. As TradeTester includes an SQL database for saving orders then controller
+must be initialized by providing a path and a Sqlite3 database name. TradeTester will create
+a database in that location with that name. Each instance of controller will have its own
+database. In the future it is visioned that there will be only one instance of controller
+running 24/7 and user will use it to add and removed new testruns (strategies).
+
 ::
 
-  from datetime import datetime
-  import backtrader as bt
+  contr=controller(r"C:\Users\User\Documents\tradeTester\development_materials\testDB.db")
 
-  class SmaCross(bt.SignalStrategy):
-      def __init__(self):
-          sma1, sma2 = bt.ind.SMA(period=10), bt.ind.SMA(period=30)
-          crossover = bt.ind.CrossOver(sma1, sma2)
-          self.signal_add(bt.SIGNAL_LONG, crossover)
+After creating a controller instance user can use that to add new testruns via method 
+``start_testrun()`` and providing unique name for testrun, strategy class template,
+asset, exchange/market, timeframe interval and starting account size.
 
-  cerebro = bt.Cerebro()
-  cerebro.addstrategy(SmaCross)
+::
 
-  data0 = bt.feeds.YahooFinanceData(dataname='MSFT', fromdate=datetime(2011, 1, 1),
-                                    todate=datetime(2012, 12, 31))
-  cerebro.adddata(data0)
+  tuid=contr.start_testrun("myTest1", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000)
 
-  cerebro.run()
-  cerebro.plot()
+This method will return an integer (TUID - Testrun Unique ID) which can be used later to
+uniquely reference that testrun.
 
-Including a full featured chart. Give it a try! This is included in the samples
-as ``sigsmacross/sigsmacross2.py``. Along it is ``sigsmacross.py`` which can be
-parametrized from the command line.
+TradeTester is designed with an idea of having GUI in the future. Because of that reason 
+the logic is that testruns (strategies) will send all orders to SQLManager instance which
+takes care of saving them into database. The GUI will display data (orders, ticker data etc.)
+for one particular testrun at any given time. This is set by setting the streamer in SQLManager
+(via controller instance). The streamer setting means that SQLManager will propagate only that
+testrun related data to GUI. Propagating data is done via Queues.
 
-Features:
-=========
+::
 
-Live Trading and backtesting platform written in Python.
-
-  - Live Data Feed and Trading with
-
-    - Interactive Brokers (needs ``IbPy`` and benefits greatly from an
-      installed ``pytz``)
-    - *Visual Chart* (needs a fork of ``comtypes`` until a pull request is
-      integrated in the release and benefits from ``pytz``)
-    - *Oanda* (needs ``oandapy``) (REST API Only - v20 did not support
-      streaming when implemented)
-
-  - Data feeds from csv/files, online sources or from *pandas* and *blaze*
-  - Filters for datas, like breaking a daily bar into chunks to simulate
-    intraday or working with Renko bricks
-  - Multiple data feeds and multiple strategies supported
-  - Multiple timeframes at once
-  - Integrated Resampling and Replaying
-  - Step by Step backtesting or at once (except in the evaluation of the Strategy)
-  - Integrated battery of indicators
-  - *TA-Lib* indicator support (needs python *ta-lib* / check the docs)
-  - Easy development of custom indicators
-  - Analyzers (for example: TimeReturn, Sharpe Ratio, SQN) and ``pyfolio``
-    integration (**deprecated**)
-  - Flexible definition of commission schemes
-  - Integrated broker simulation with *Market*, *Close*, *Limit*, *Stop*,
-    *StopLimit*, *StopTrail*, *StopTrailLimit*and *OCO* orders, bracket order,
-    slippage, volume filling strategies and continuous cash adjustmet for
-    future-like instruments
-  - Sizers for automated staking
-  - Cheat-on-Close and Cheat-on-Open modes
-  - Schedulers
-  - Trading Calendars
-  - Plotting (requires matplotlib)
-
-Documentation
-=============
-
-The blog:
-
-  - `Blog <http://www.backtrader.com/blog>`_
-
-Read the full documentation at:
-
-  - `Documentation <http://www.backtrader.com/docu>`_
-
-List of built-in Indicators (122)
-
-  - `Indicators Reference <http://www.backtrader.com/docu/indautoref.html>`_
-
-Python 2/3 Support
-==================
-
-  - Python >= ``3.2``
-
-  - It also works with ``pypy`` and ``pypy3`` (no plotting - ``matplotlib`` is
-    not supported under *pypy*)
-
-Installation
-============
-
-``backtrader`` is self-contained with no external dependencies (except if you
-want to plot)
-
-From *pypi*:
-
-  - ``pip install backtrader``
-
-  - ``pip install backtrader[plotting]``
-
-    If ``matplotlib`` is not installed and you wish to do some plotting
-
-.. note:: The minimum matplotlib version is ``1.4.1``
-
-An example for *IB* Data Feeds/Trading:
-
-  - ``IbPy`` doesn't seem to be in PyPi. Do either::
-
-      pip install git+https://github.com/blampe/IbPy.git
-
-    or (if ``git`` is not available in your system)::
-
-      pip install https://github.com/blampe/IbPy/archive/master.zip
-
-For other functionalities like: ``Visual Chart``, ``Oanda``, ``TA-Lib``, check
-the dependencies in the documentation.
-
-From source:
-
-  - Place the *backtrader* directory found in the sources inside your project
-
-Version numbering
-=================
-
-X.Y.Z.I
-
-  - X: Major version number. Should stay stable unless something big is changed
-    like an overhaul to use ``numpy``
-  - Y: Minor version number. To be changed upon adding a complete new feature or
-    (god forbids) an incompatible API change.
-  - Z: Revision version number. To be changed for documentation updates, small
-    changes, small bug fixes
-  - I: Number of Indicators already built into the platform
+  contr.select_testrun(tuid1)

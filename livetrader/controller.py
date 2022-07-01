@@ -11,12 +11,12 @@ class controller(threading.Thread):
     classdocs
     '''
 
-    def __init__(self):
+    def __init__(self, sql_path):
         '''
         Constructor
         '''
         self.data_collector=tdr()
-        self.sql=sqlManager(r"C:\Users\User\Documents\Projektid\Python\tradeTester\development_materials\test0_db.db") 
+        self.sql=sqlManager(sql_path) 
         self.sql_input, self.sql_output=self.sql.get_io()
         self.sql.start()
         self.testruns=testruns(self.data_collector, self.sql) 
