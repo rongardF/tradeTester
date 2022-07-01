@@ -2,9 +2,9 @@ Description
 ==========
 
 TradeTester is a tool to test various trading strategies both on historic 
-data and on live data streams. Tool uses `backtrader <https://www.backtrader.com/>` to provide the comprehensive 
-testing environment and `tvDatafeed <https://pypi.org/project/tvdatafeed/>` to easily (and without charge) retrieve both 
-historic and live ticker data from `TradingView <https://www.tradingview.com/>` platform.
+data and on live data streams. Tool uses `backtrader <https://www.backtrader.com/>`_ to provide the comprehensive 
+testing environment and `tvDatafeed <https://pypi.org/project/tvdatafeed/>`_ to easily (and without charge) retrieve both 
+historic and live ticker data from `TradingView <https://www.tradingview.com/>`_ platform.
 
 TradeTester is provides controller through which user can create and manage testruns. 
 Testruns are essentially separate threads executing backtrader (cerebro) with user specified
