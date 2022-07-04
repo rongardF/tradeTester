@@ -96,15 +96,15 @@ class tvDatafeedRealtime():
         '''
         self.__am.get_lock(timeout)
         asset_id=self.__am.add_asset(symbol, exchange, interval)
-        if asset_id is not None: #  if this asset was not already under monitoring, no duplicates are allowed
-            in_list=self.__am.get_timeframe(interval) # get the next update time for this interval
-            if in_list is None: # None if we are not monitoring this interval yet
-                data=self.__tv_datafeed.get_hist(symbol,exchange,n_bars=1,interval=interval) # get 1-bar data for this symbol and interval
-                self.__am.add_timeframe(interval, data.index.to_pydatetime()[0]) # add this datetime into list of timeframes we monitor; to_pydatetime converts into list of datetime objects
+        in_list=self.__am.get_timeframe(interval) # get the next update time for this interval
+        if in_list is None: # None if we are not monitoring this interval yet
+            data=self.__tv_datafeed.get_hist(symbol,exchange,n_bars=1,interval=interval) # get 1-bar data for this symbol and interval
+            self.__am.add_timeframe(interval, data.index.to_pydatetime()[0]) # add this datetime into list of timeframes we monitor; to_pydatetime converts into list of datetime objects
         
         self.__am.drop_lock() 
         
         if self.__main_thread is None: # if main thread is not running then start (might have not yet started or might have closed when all asset sets were removed)
+            self.__shutdown.clear() # reset shutdown flag
             self.__main_thread = threading.Thread(target=self.__collect_data_loop, args=(self.__shutdown,))
             self.__main_thread.start() 
         
@@ -117,6 +117,8 @@ class tvDatafeedRealtime():
             self.__callback_threads.pop(queue) # remove the callback thread reference from the dictionary
             queue.put("EXIT") # send exit signal to thread
         self.__am.del_asset(asset_id) # delete the asset itself
+        if self.__am.is_empty():
+            self.__shutdown.set() # signal the __collect_data and main loop that they should close
         self.__am.drop_lock()
         
     def __collect_data(self, shutdown):
@@ -126,7 +128,7 @@ class tvDatafeedRealtime():
                 raise RuntimeError() # raise an exception so we'll exit the while loop and close the thread
             
         self.__am.get_lock() # we will not time out, but wait however long necessary
-        updated_timeframes=self.__am.get_updated_timeframes() # returns a list of booleans for all intervals that we monitor
+        updated_timeframes=self.__am.update_timeframes() # returns a list of booleans for all intervals that we monitor
         self.__timeout_datetime=self.__am.get_timeout_dt() # get datetime when next sample should becomes available (wait time)
         
         for inter in updated_timeframes:
@@ -208,9 +210,9 @@ class tvDatafeedRealtime():
         try: 
             while not shutdown.is_set(): # loop this function in this thread until shutdown signal received
                 self.__collect_data(shutdown)
-                if self.__timeout_datetime is None: # if None after running collect_data then no asset sets added and we will stop thread because nothing to do
-                    self.__main_thread = None # clear this reference because this thread will be closed
-                    return 
+                # if self.__timeout_datetime is None: # if None after running collect_data then no asset sets added and we will stop thread because nothing to do
+                #     self.__main_thread = None # clear this reference because this thread will be closed
+                #     return 
         except RuntimeError: # this is expected if shutdown signal was sent
             if self.__am.islocked():
                 self.__am.drop_lock() # release the lock so in case something is blocked because of this
@@ -218,6 +220,8 @@ class tvDatafeedRealtime():
             for asset in self.__am.get_asset_list():
                 for queue in asset.get_callback_queues():
                     queue.put("EXIT") 
+            
+            self.__main_thread = None
         
     def __del__(self):
         # make sure that all threads are stopped
