@@ -123,7 +123,7 @@ class assetManager(object):
         else:
             return False  
     
-    def get_updated_timeframes(self):
+    def update_timeframes(self):
         timeframes_updated=[] # this list will contain interval enum values for which new data is available
         dt_now=dt.now()
         for inter, dt_next_update in self.__update_times.items(): # go through all the interval/timeframes for which we have assets to monitor
@@ -167,4 +167,13 @@ class assetManager(object):
         
     def del_queue(self, asset_id, queue_id):
         return self.__assets[asset_id].del_queue(queue_id)
-        
+    
+    def is_empty(self):
+        '''
+        Check if no assets in the monitor list
+        '''
+        if self.__assets:
+            return False
+        else:
+            return True
+            
