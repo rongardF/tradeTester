@@ -25,6 +25,8 @@ class testruns(object):
         testrun=self.get_testrun(TUID)
         testrun.close_testrun() # close down testrun
         self.sql.close_testrun(testrun) # close testrun in database and also close streamer
+        if not self.is_asset_used(testrun.asset_id): # is asset not used by any other testruns
+            self.data_collector.del_symbol(testrun.asset_id)
         testrun.exception_callback(e, TUID) # call the callback provided by the user (controller.py)
     
     def new_testrun(self, testrun_name, strategy, symbol, exchange, interval, account_size, exception_callback):  
@@ -57,7 +59,10 @@ class testruns(object):
             self.sql.close_testrun(testrun) # close testrun in database and also close streamer
             testrun.get_strat_ref().stop() # stop the strategyRunner instance for this strategy
             #self.remove_testrun(asset_id, TUID) # remove the testrun from the list of active testruns
-    
+        
+        if not self.is_asset_used(testrun.asset_id): # is asset not used by any other testruns
+            self.data_collector.del_symbol(testrun.asset_id)
+            
     def get_testrun(self, TUID):
         for testruns_list in self.testruns_dict.values():
             for testrun in testruns_list:
@@ -65,7 +70,18 @@ class testruns(object):
                     return testrun
         
         return None # if no such testrun exists 
-
+    
+    def is_asset_used(self, asset_id):
+        '''
+        Check if this asset set is used by any testruns
+        '''
+        for testruns_list in self.testruns_dict.values():
+            for testrun in testruns_list:
+                if (testrun.asset_id == asset_id) and (testrun.state == "OPEN"): # uses this asset set and is open
+                    return True 
+        
+        return False
+    
 class testrun(object):
     
     def __init__(self, testrun_name, start_datetime, symbol, exchange, interval, asset_id, starting_account, exception_callback):
