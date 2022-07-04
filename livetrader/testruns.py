@@ -21,16 +21,22 @@ class testruns(object):
                     return True
         return False
     
+    def exception_handler(self, e, TUID):
+        testrun=self.get_testrun(TUID)
+        testrun.close_testrun() # close down testrun
+        self.sql.close_testrun(testrun) # close testrun in database and also close streamer
+        testrun.exception_callback(e, TUID) # call the callback provided by the user (controller.py)
+    
     def new_testrun(self, testrun_name, strategy, symbol, exchange, interval, account_size, exception_callback):  
         if self.is_name_used(testrun_name): # if name is used then return None which informs user
             return None
         
         asset_id=self.data_collector.add_symbol(symbol, exchange, interval) # get ID for this asset set - it might already exists in data_collector
         new_testrun=testrun(testrun_name, dt.now().strftime("%d-%m-%y %H:%M"), \
-                            symbol, exchange, str(interval), asset_id, account_size) # opposite operation is datetime_obj=dt.strptime(start_dt_str,"%d-%m-%y %H:%M")
+                            symbol, exchange, str(interval), asset_id, account_size, exception_callback) # opposite operation is datetime_obj=dt.strptime(start_dt_str,"%d-%m-%y %H:%M")
         new_testrun=self.sql.add_testrun(new_testrun) # add testrun into SQL database and assign TUID for testrun
         TUID=new_testrun.get_TUID()
-        strat_ref=strategy_runner(self.data_collector, self.sql_input, TUID, asset_id, strategy, exception_callback) # SOMEHOW HAVE TO ENTER THE SQL_INPUT FOR STRATEGY INSTANCE
+        strat_ref=strategy_runner(self.data_collector, self.sql_input, TUID, asset_id, strategy, self.exception_handler) # SOMEHOW HAVE TO ENTER THE SQL_INPUT FOR STRATEGY INSTANCE
         new_testrun.add_strat_ref(strat_ref)
         if asset_id in self.testruns_dict.keys(): # if already existing then just append testrun reference
             self.testruns_dict[asset_id].append(new_testrun)
@@ -44,22 +50,25 @@ class testruns(object):
     
     def close_testrun(self, TUID):
         testrun=self.get_testrun(TUID) # get testrun object based on TUID
-        # asset_id=testrun.get_asset_id()
-        # TUID=testrun.get_TUID()
-        testrun.close_testrun() # change the testrun status
-        self.sql.close_testrun(testrun) # close testrun in database and also close streamer
-        testrun.get_strat_ref().stop() # stop the strategyRunner instance for this strategy
-        #self.remove_testrun(asset_id, TUID) # remove the testrun from the list of active testruns
+        if testrun.state == "OPEN": # check that it hasn't already been closed (by exception handler)
+            # asset_id=testrun.get_asset_id()
+            # TUID=testrun.get_TUID()
+            testrun.close_testrun() # change the testrun status
+            self.sql.close_testrun(testrun) # close testrun in database and also close streamer
+            testrun.get_strat_ref().stop() # stop the strategyRunner instance for this strategy
+            #self.remove_testrun(asset_id, TUID) # remove the testrun from the list of active testruns
     
     def get_testrun(self, TUID):
         for testruns_list in self.testruns_dict.values():
             for testrun in testruns_list:
                 if TUID == testrun.TUID:
                     return testrun
+        
+        return None # if no such testrun exists 
 
 class testrun(object):
     
-    def __init__(self, testrun_name, start_datetime, symbol, exchange, interval, asset_id, starting_account):
+    def __init__(self, testrun_name, start_datetime, symbol, exchange, interval, asset_id, starting_account, exception_callback):
         self.TUID=None
         self.name=testrun_name
         self.state="OPEN"
@@ -72,6 +81,7 @@ class testrun(object):
         self.starting_account=starting_account
         self.closing_account="NULL"
         self.strat_ref=None
+        self.exception_callback=exception_callback
         
     def close_testrun(self):
         self.state="CLOSED"

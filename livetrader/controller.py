@@ -56,7 +56,8 @@ class controller(threading.Thread):
         '''
         Stop strategy from running
         '''
-        self.testruns.close_testrun(TUID) # get the testrun object
+        if self.testruns.get_testrun(TUID) is not None: # check first that such a testrun exists
+            self.testruns.close_testrun(TUID) # get the testrun object
     
     def stop_all_testruns(self):
         '''
