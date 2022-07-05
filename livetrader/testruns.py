@@ -62,6 +62,18 @@ class testruns(object):
         
         if not self.is_asset_used(testrun.asset_id): # is asset not used by any other testruns
             self.data_collector.del_symbol(testrun.asset_id)
+    
+    def del_testrun(self, TUID):
+        '''
+        Delete the testrun from testruns dictionary and remove from SQL database
+        '''
+        testrun=self.get_testrun(TUID)
+        asset_id=testrun.asset_id
+        self.testruns_dict[asset_id].remove(testrun) # remove testrun from the list
+        if not self.testruns_dict[asset_id]: # no more testruns for this asset_id remove asset_id group from dictionary
+            del self.testruns_dict[asset_id]
+        
+        self.sql.del_testrun(TUID)
             
     def get_testrun(self, TUID):
         for testruns_list in self.testruns_dict.values():

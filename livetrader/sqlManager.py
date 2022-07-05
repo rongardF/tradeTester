@@ -114,6 +114,14 @@ class sqlDatabase(object):
         self.db_cursor.execute("SELECT * FROM testruns")
         return self.db_cursor.fetchall()
     
+    def query_delete_testrun(self, TUID):
+        self.db_cursor.execute("DELETE FROM testruns WHERE TUID = (?)", (TUID,))
+        self.db_con.commit()
+    
+    def query_delete_orders(self, TUID):
+        self.db_cursor.execute("DELETE FROM orders WHERE TUID = (?)", (TUID,))
+        self.db_con.commit()
+    
 class sqlManager(threading.Thread):
 
     def __init__(self, database_path=None):
@@ -204,6 +212,12 @@ class sqlManager(threading.Thread):
     def set_streamer(self, TUID, asset_id):
         self.get_lock() # as thread might be running at the same time then lock the resource before continuing
         self.active_listen=[TUID, asset_id] # save the TUID for which testrun we are actively forwarding (streaming) order (and in future ticker) data
+        self.drop_lock()
+    
+    def del_testrun(self, TUID):
+        self.get_lock()
+        self.database.query_delete_orders(TUID)
+        self.database.query_delete_testrun(TUID)
         self.drop_lock()
     
     def stop(self):

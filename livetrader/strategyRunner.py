@@ -30,5 +30,5 @@ class strategyRunner(threading.Thread):
         
     def stop(self):
         self.live_feed.remove_callback() # first remove callback from data_collector - then we can be sure that nothing else is calling receive_data() method
-        self.live_feed.receive_data("EXIT")
+        self.live_feed.receive_data("EXIT") # send a signal to the feed that data streaming has ended (cerebro will finish)
         
