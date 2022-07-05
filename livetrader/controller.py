@@ -117,7 +117,7 @@ class controller(threading.Thread):
         '''
         Stop all strategies from running - this is called before closing down tradeTester application
         '''
-        raise NotImplemented
+        self.testruns.close_all_testruns()
     
     def del_testrun(self, TUID):
         '''
