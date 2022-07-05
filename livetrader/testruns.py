@@ -65,15 +65,26 @@ class testruns(object):
     def close_testrun(self, TUID):
         testrun=self.get_testrun(TUID) # get testrun object based on TUID
         if testrun.state == "OPEN": # check that it hasn't already been closed (by exception handler)
-            # asset_id=testrun.get_asset_id()
-            # TUID=testrun.get_TUID()
             testrun.close_testrun() # change the testrun status
             self.sql.close_testrun(testrun) # close testrun in database and also close streamer
             testrun.get_strat_ref().stop() # stop the strategyRunner instance for this strategy
-            #self.remove_testrun(asset_id, TUID) # remove the testrun from the list of active testruns
         
         if not self.is_asset_used(testrun.asset_id): # is asset not used by any other testruns
             self.data_collector.del_symbol(testrun.asset_id)
+    
+    def close_all_testruns(self):
+        '''
+        Close all open testruns
+        '''
+        for testruns_list in self.testruns_dict.values():
+            for testrun in testruns_list: 
+                if testrun.state == "OPEN": # check that it hasn't already been closed (by exception handler)
+                    testrun.close_testrun() # change the testrun status
+                    self.sql.close_testrun(testrun) # close testrun in database and also close streamer
+                    testrun.get_strat_ref().stop() # stop the strategyRunner instance for this strategy
+                
+                if not self.is_asset_used(testrun.asset_id): # is asset not used by any other testruns
+                    self.data_collector.del_symbol(testrun.asset_id)
     
     def del_testrun(self, TUID):
         '''
