@@ -61,15 +61,16 @@ class controller(threading.Thread):
     
     def stop_all_testruns(self):
         '''
-        Stop all strategies from running - this is called before closign down tradeTester application
+        Stop all strategies from running - this is called before closing down tradeTester application
         '''
         pass
     
-    def del_testrun(self):
+    def del_testrun(self, TUID):
         '''
         Remove testrun from the list and all related data
         '''
-        raise NotImplemented
+        self.stop_testrun(TUID) # first stop the testrun from running
+        self.testruns.del_testrun(TUID)
     
     def select_testrun(self, TUID):
         '''
