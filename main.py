@@ -31,7 +31,7 @@ class MyStrategy(bt.Strategy):
 
     def next(self):
         if self.order: # if order already created then close it
-            #raise ValueError("TEST")
+            raise ValueError("TEST")
             self.order.close_order(str(dt.now().strftime("%d-%m-%y %H:%M")), self.data.close[0], 10000.0)
             pack=packet(operations.close_order, self.order.TUID, self.order)
             self.p.sql_input.put(pack)
@@ -72,19 +72,4 @@ if __name__ == "__main__":
     t=threading.Thread(target=terminal, args=(contr.sql_output,))
     t.start()
     print("Thread started, waiting...")
-    time.sleep(120)
-    testrun_list=contr.get_testruns()
-    print(testrun_list)
-    print("Stopping testrun1")
-    contr.stop_testrun(tuid1)
-    print("Deleting testrun1")
-    contr.del_testrun(tuid1)
-    print("Deleting testrun2")
-    contr.del_testrun(tuid2)
-    print("Deleted")
-    print("Starting new testrun")
-    tuid3=contr.start_testrun("myTest3", MyStrategy1, "ETHUSDT", "KUCOIN", Interval.in_3_minute, 10000)
-    time.sleep(190)
-    contr.stop_testrun(tuid3)
-    print("Waiting...")
     time.sleep(300)
