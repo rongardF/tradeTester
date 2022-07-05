@@ -4,6 +4,20 @@
 from datetime import datetime as dt
 from livetrader.strategyRunner import strategyRunner as strategy_runner
 
+class testrun_data(object):
+    
+    def __init__(self, TUID, name, state, start_dt, close_dt, symbol, exchange, interval, starting_account, closing_account):
+        self.TUID=TUID
+        self.name=name
+        self.state=state
+        self.start_datetime=start_dt
+        self.close_datetime=close_dt
+        self.symbol=symbol
+        self.exchange=exchange
+        self.interval=interval
+        self.starting_account=starting_account
+        self.closing_account=closing_account
+
 class testruns(object):
     
     def __init__(self, data_collector, sql): # user can specify the starting value for order_id (incase we are going from backtest to forward test)
