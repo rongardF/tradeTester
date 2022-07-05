@@ -65,10 +65,14 @@ class MyStrategy1(bt.Strategy):
 if __name__ == "__main__":
     contr=controller(r"C:\Users\User\Documents\Projektid\Python\tradeTester\development_materials\test_db.db")
     #contr.start()
-    tuid1=contr.start_testrun("myTest1", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000) # strategy name must be unique and orders for that testrun must be removed from DB before running
-    tuid2=contr.start_testrun("myTest2", MyStrategy1, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000)
+    tuid1=contr.start_testrun("myTest", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000) # strategy name must be unique and orders for that testrun must be removed from DB before running
+    tuid2=contr.start_testrun("myTest", MyStrategy1, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000)
+    print(str(tuid1))
+    print(str(tuid2))
     #tuid3=contr.start_testrun("myTest3", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_3_minute, 10000)
     contr.select_testrun(tuid1)
+    testruns=contr.get_testruns()
+    print(testruns)
     t=threading.Thread(target=terminal, args=(contr.sql_output,))
     t.start()
     print("Thread started, waiting...")

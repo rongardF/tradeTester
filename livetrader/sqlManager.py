@@ -80,12 +80,17 @@ class sqlDatabase(object):
         self.db_con.commit()
         
     def query_insert_testrun(self, testrun_data): # this method returns TUID (row_id) of the newly added testrun
-        # create a new row in testruns table
+        # create a new entry in testruns table
         self.db_cursor.execute("INSERT INTO testruns VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?)", testrun_data) # testrun_data must be a tuple
         self.db_con.commit()
-        # get the auto-incremented TUID value
-        self.db_cursor.execute("SELECT * FROM testruns WHERE name = ?", (testrun_data[0],))
-        return self.db_cursor.fetchall()[0][0] # fetchall returns a list of tuples; we select the first element from the first tuple
+        # get the auto-incremented TUID value using state field
+        self.db_cursor.execute("SELECT * FROM testruns WHERE state = ?", ("NEW",))
+        tuid=self.db_cursor.fetchall()[0][0] # fetchall returns a list of tuples; we select the first element from the first tuple
+        # change the state field to "OPEN"
+        self.db_cursor.execute("UPDATE testruns SET state = (?) WHERE TUID = (?)",("OPEN",tuid))
+        self.db_con.commit()
+        
+        return tuid
     
     def query_insert_order(self, order_data):
         self.db_cursor.execute("INSERT INTO orders VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", order_data) # order_data must be a tuple 

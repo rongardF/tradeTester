@@ -34,16 +34,22 @@ class controller(threading.Thread):
         print("Exception from "+str(TUID))
         traceback.print_exception(e)
         
+    def get_testrun(self, TUID):
+        '''
+        Retrieve testrun object for this TUID from testruns
+        '''
+        raise NotImplemented
+    
     def get_testruns(self):
         '''
-        Return a list of all the strategies (running and stopped)
+        Return a dictionary of all the testruns (running and stopped) - key is the TUID and value is the testrun/strategy name
         '''
-        name_list=[]
+        testruns_dict={}
         testruns=self.sql.read_testruns()
         for testrun in testruns:
-            name_list.append(testrun[1])
+            testruns_dict[testrun[0]]=testrun[1]
         
-        return name_list
+        return testruns_dict
     
     def start_testrun(self, testrun_name, strategy, symbol, exchange, interval, account_size):
         '''
@@ -63,7 +69,7 @@ class controller(threading.Thread):
         '''
         Stop all strategies from running - this is called before closing down tradeTester application
         '''
-        pass
+        raise NotImplemented
     
     def del_testrun(self, TUID):
         '''
