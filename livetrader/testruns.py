@@ -31,9 +31,6 @@ class testruns(object):
         testrun.exception_callback(e, TUID) # call the callback provided by the user (controller.py)
     
     def new_testrun(self, testrun_name, strategy, symbol, exchange, interval, account_size, exception_callback):  
-        if self.is_name_used(testrun_name): # if name is used then return None which informs user
-            return None
-        
         asset_id=self.data_collector.add_symbol(symbol, exchange, interval) # get ID for this asset set - it might already exists in data_collector
         new_testrun=testrun(testrun_name, dt.now().strftime("%d-%m-%y %H:%M"), \
                             symbol, exchange, str(interval), asset_id, account_size, exception_callback) # opposite operation is datetime_obj=dt.strptime(start_dt_str,"%d-%m-%y %H:%M")
@@ -119,7 +116,7 @@ class testrun(object):
     
     def get_sql_params(self):
         if self.state == "OPEN":
-            return (self.name, self.state, self.start_datetime, self.close_datetime, self.symbol, \
+            return (self.name, "NEW", self.start_datetime, self.close_datetime, self.symbol, \
                     self.exchange, self.interval, self.starting_account, self.closing_account)
         else:
             return (self.state, self.close_datetime, self.TUID)
