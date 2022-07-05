@@ -31,7 +31,7 @@ class MyStrategy(bt.Strategy):
 
     def next(self):
         if self.order: # if order already created then close it
-            raise ValueError("TEST")
+            #raise ValueError("TEST")
             self.order.close_order(str(dt.now().strftime("%d-%m-%y %H:%M")), self.data.close[0], 10000.0)
             pack=packet(operations.close_order, self.order.TUID, self.order)
             self.p.sql_input.put(pack)
@@ -65,8 +65,8 @@ class MyStrategy1(bt.Strategy):
 if __name__ == "__main__":
     contr=controller(r"C:\Users\User\Documents\Projektid\Python\tradeTester\development_materials\test_db.db")
     #contr.start()
-    tuid1=contr.start_testrun("myTest", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000) # strategy name must be unique and orders for that testrun must be removed from DB before running
-    tuid2=contr.start_testrun("myTest", MyStrategy1, "ETHUSDT", "KUCOIN", Interval.in_1_minute, 10000)
+    tuid1=contr.start_testrun("myTest", MyStrategy, "ETHUSDT", "KUCOIN", "1 minute", 10000) # strategy name must be unique and orders for that testrun must be removed from DB before running
+    tuid2=contr.start_testrun("myTest", MyStrategy1, "ETHUSDT", "KUCOIN", "1 minute", 10000)
     print(str(tuid1))
     print(str(tuid2))
     #tuid3=contr.start_testrun("myTest3", MyStrategy, "ETHUSDT", "KUCOIN", Interval.in_3_minute, 10000)
@@ -76,4 +76,6 @@ if __name__ == "__main__":
     t=threading.Thread(target=terminal, args=(contr.sql_output,))
     t.start()
     print("Thread started, waiting...")
-    time.sleep(300)
+    time.sleep(900)
+    orders=contr.get_orders(tuid2)
+    print(orders)
