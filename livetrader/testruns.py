@@ -27,6 +27,7 @@ class testruns(object):
         self.sql.close_testrun(testrun) # close testrun in database and also close streamer
         if not self.is_asset_used(testrun.asset_id): # is asset not used by any other testruns
             self.data_collector.del_symbol(testrun.asset_id)
+        self.del_testrun(TUID) # remove garbage values that might have been created
         testrun.exception_callback(e, TUID) # call the callback provided by the user (controller.py)
     
     def new_testrun(self, testrun_name, strategy, symbol, exchange, interval, account_size, exception_callback):  
