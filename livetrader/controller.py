@@ -1,10 +1,11 @@
 import threading
 import traceback
-from datetime import datetime as dt
 
+from datetime import datetime as dt
+from tvDatafeed import Interval
 from tvDatafeed.tvDatafeedRealtime import tvDatafeedRealtime as tdr
 from livetrader.sqlManager import sqlManager
-from livetrader.testruns import testruns
+from livetrader.testruns import testruns, testrun_data
 
 class controller(threading.Thread):
     '''
@@ -23,6 +24,20 @@ class controller(threading.Thread):
 
         threading.Thread.__init__(self)
         
+        self.str2inter={"1 minute":Interval.in_1_minute, "3 minutes":Interval.in_3_minute, \
+                        "5 minutes":Interval.in_5_minute, "15 minutes":Interval.in_15_minute, \
+                        "30 minutes":Interval.in_30_minute, "45 minutes":Interval.in_45_minute, \
+                         "1 hour":Interval.in_1_hour, "2 hours":Interval.in_2_hour, "3 hours":Interval.in_3_hour, \
+                         "4 hours":Interval.in_4_hour, "1 day":Interval.in_daily, "1 week":Interval.in_weekly, \
+                         "1 month":Interval.in_monthly}
+        
+        self.inter2str={"Interval.in_1_minute":"1 minute","Interval.in_3_minute":"3 minutes", \
+                        "Interval.in_5_minute":"5 minutes", "Interval.in_15_minute":"15 minutes", \
+                        "Interval.in_30_minute":"30 minutes", "Interval.in_45_minute":"45 minutes", \
+                        "Interval.in_1_hour":"1 hour", "Interval.in_2_hour":"2 hours", "Interval.in_3_hour":"3 hours", \
+                        "Interval.in_4_hour":"4 hours", "Interval.in_daily":"1 day", "Interval.in_weekly":"1 week", \
+                        "Interval.in_monthly":"1 month"}
+        
     def run(self):
         while True:
             pass
@@ -33,29 +48,62 @@ class controller(threading.Thread):
         '''
         print("Exception from "+str(TUID))
         traceback.print_exception(e)
+    
+    def __str2interval(self, inter_str):
+        if inter_str in self.str2inter:
+            return self.str2inter[inter_str]
+        else:
+            raise ValueError("No such interval string")
         
-    def get_testrun(self, TUID):
+    def __interval2str(self, interval):
+        if interval in self.inter2str:
+            return self.inter2str[interval]
+        else:
+            raise ValueError("No such interval")
+        
+    def get_orders(self, TUID):
         '''
-        Retrieve testrun object for this TUID from testruns
+        Return a list of order_data objects for all the orders for this particular testrun (TUID)
         '''
-        raise NotImplemented
+        orders_list=[]
+        orders=self.sql.read_orders(TUID)
+        for order in orders:
+            if order[4] == "NULL":
+                stop_dt="N/A"
+            else:
+                stop_dt=dt.strptime(order[4],"%d-%m-%y %H:%M")
+                
+            orders_list.append(testrun_data(order[0], order[2], dt.strptime(order[3],"%d-%m-%y %H:%M"), \
+                                              stop_dt, order[5], order[6], order[7], \
+                                              order[8], order[9], order[9]))
+        
+        return orders_list
     
     def get_testruns(self):
         '''
-        Return a dictionary of all the testruns (running and stopped) - key is the TUID and value is the testrun/strategy name
+        Return a list of testrun_data objects for all the testruns in database (running and stopped) 
         '''
-        testruns_dict={}
+        testruns_list=[]
         testruns=self.sql.read_testruns()
         for testrun in testruns:
-            testruns_dict[testrun[0]]=testrun[1]
+            if testrun[4] == "NULL":
+                stop_dt="N/A"
+            else:
+                stop_dt=dt.strptime(testrun[4],"%d-%m-%y %H:%M")
+                
+            testruns_list.append(testrun_data(testrun[0], testrun[1], testrun[2],\
+                                              dt.strptime(testrun[3],"%d-%m-%y %H:%M"), \
+                                              stop_dt, \
+                                              testrun[5], testrun[6], self.__interval2str(testrun[7]), \
+                                              testrun[8], testrun[9]))
         
-        return testruns_dict
+        return testruns_list
     
     def start_testrun(self, testrun_name, strategy, symbol, exchange, interval, account_size):
         '''
         Start a new testrun with provided strategy
         '''
-        TUID=self.testruns.new_testrun(testrun_name, strategy, symbol, exchange, interval, account_size, self.exception_handler)
+        TUID=self.testruns.new_testrun(testrun_name, strategy, symbol, exchange, self.__str2interval(interval), account_size, self.exception_handler)
         return TUID
     
     def stop_testrun(self, TUID):

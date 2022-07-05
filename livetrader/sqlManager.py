@@ -111,8 +111,8 @@ class sqlDatabase(object):
         self.db_cursor.execute("UPDATE orders SET state = (?), close_datetime = (?), close_price = (?), close_account_size = (?) WHERE TUID = (?) AND order_id = (?)",order_data)
         self.db_con.commit()
         
-    def query_read_orders(self, testrun_ID):
-        self.db_cursor.execute("SELECT * FROM testruns WHERE TUID = ?",testrun_ID)
+    def query_read_orders(self, TUID):
+        self.db_cursor.execute("SELECT * FROM orders WHERE TUID = ?",(TUID,))
         return self.db_cursor.fetchall()
     
     def query_read_testruns(self):
@@ -208,10 +208,11 @@ class sqlManager(threading.Thread):
         return testruns
     
     # write this as a direct method called by controller
-    def read_orders(self, sender, TUID): # this function returns all the orders which are newly added
+    def read_orders(self, TUID): # this function returns all the orders which are newly added
+        self.get_lock()
         orders=self.database.query_read_orders(TUID)
-        reply_packet=packet(operations.read_orders, sender, orders)
-        self.output_queue.put(reply_packet) # send the packet to GUI
+        self.drop_lock()
+        return orders
     
     # write this as a direct method called by controller
     def set_streamer(self, TUID, asset_id):

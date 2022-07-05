@@ -1,4 +1,17 @@
 
+class order_data(object):
+    
+    def __init__(self, order_id, state, open_dt, close_dt, order_type, entry_price, close_price, position, stop_loss, take_profit):
+        self.order_id=order_id 
+        self.state=state 
+        self.open_datetime=open_dt 
+        self.close_datetime=close_dt
+        self.order_type=order_type
+        self.entry_price=entry_price
+        self.close_price=close_price
+        self.position_size=position
+        self.stop_loss_price=stop_loss
+        self.take_profit_price=take_profit
 
 class orders(object):
     
