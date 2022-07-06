@@ -54,7 +54,7 @@ class tvDatafeedRealtime():
         opposite operation to run() - shut down and stop retrieving data 
         samples
     '''
-    def __init__(self, username=None, password=None, chromedriver_path=None, auto_login=True):
+    def __init__(self, unique_asset_id=True, username=None, password=None, chromedriver_path=None, auto_login=True):
         '''
         Parameters
         ----------
@@ -68,7 +68,7 @@ class tvDatafeedRealtime():
             specify if system tries to login or uses public TradingView 
             interface by default (default True)
         '''
-        self.__am=assetManager()
+        self.__am=assetManager(unique_asset_id)
         self.__tv_datafeed = TvDatafeed(username=username, password=password, chromedriver_path=chromedriver_path, auto_login=auto_login) 
         self.__timeout_datetime = None # this specifies the time waited until next sample(s) are retrieved from tradingView 
         
@@ -113,6 +113,9 @@ class tvDatafeedRealtime():
     def del_symbol(self, asset_id, timeout=-1):
         self.__am.get_lock(timeout)
         asset=self.__am.get_asset(asset_id)
+        if asset is None: # this asset does not exist anymore or has been deleted
+            self.__am.drop_lock()
+            return None
         for queue in asset.get_callback_queues(): # remove and close all associated callback threads and their references
             self.__callback_threads.pop(queue) # remove the callback thread reference from the dictionary
             queue.put("EXIT") # send exit signal to thread
@@ -155,13 +158,13 @@ class tvDatafeedRealtime():
         
         self.__am.drop_lock() 
     
-    def __callback_thread(self, callback_function, queue):
+    def __callback_thread(self, callback_function, queue, asset_id):
         while True:
             data=queue.get() # this blocks until we get new data sample
             if isinstance(data,str): # string means that we received "EXIT" keyword
                 break # stop looping and close the thread
             
-            callback_function(data) # call the function with data sample
+            callback_function((asset_id, data)) # call the function with tuple containing asset_id and ticker data
     
     def add_callback(self, asset_id, callback_func, timeout=-1):
         '''
@@ -186,7 +189,7 @@ class tvDatafeedRealtime():
         queue_id=self.__am.add_queue(asset_id, q) # save a reference for this queue with this specific asset set (symbol exchange, interval)
         self.__am.drop_lock() 
         
-        t=threading.Thread(target=self.__callback_thread, args=(callback_func,q)) # create a thread running callback_thread function      
+        t=threading.Thread(target=self.__callback_thread, args=(callback_func, q, asset_id)) # create a thread running callback_thread function      
         self.__callback_threads[q]=t  # use queue object reference to track callback threads because they are mapped 1-to-1; this way we hide thread reference from user
         t.start() # start callback function thread 
         
@@ -200,7 +203,7 @@ class tvDatafeedRealtime():
         q=self.__am.get_queue(asset_queue_pair[0], asset_queue_pair[1]) # get the actual queue instance ref before deleting it
         if q is None: # if no such asset anymore 
             self.__am.drop_lock() # everything already done - thread is closed and reference is removed form the list
-            return
+            return None
         self.__am.del_queue(asset_queue_pair[0], asset_queue_pair[1]) # remove this queue from that assets list so no more data is sent to that queue
         self.__am.drop_lock() 
         q.put("EXIT") # send the exit signal to that thread
