@@ -1,5 +1,5 @@
 
-class order_data(object):
+class orderData(object):
     
     def __init__(self, order_id, state, open_dt, close_dt, order_type, entry_price, close_price, position, stop_loss, take_profit):
         self.order_id=order_id 
