@@ -77,6 +77,15 @@ class sqlDatabase(object):
                                                     close_account_size REAL, \
                                                     PRIMARY KEY(TUID, order_id))")
         
+        self.db_cursor.execute("CREATE TABLE ticker_data (asset_id INTEGER PRIMARY KEY, \
+                                                        datetime TEXT NOT NULL, \
+                                                        symbol TEXT NOT NULL, \
+                                                        open REAL NOT NULL, \
+                                                        high REAL NOT NULL, \
+                                                        low REAL NOT NULL, \
+                                                        close REAL NOT NULL,\
+                                                        volume REAL NOT NULL)")
+        
         self.db_con.commit()
         
     def query_insert_testrun(self, testrun_data): # this method returns TUID (row_id) of the newly added testrun
@@ -92,6 +101,22 @@ class sqlDatabase(object):
         
         return tuid
     
+    def query_insert_ticker(self, asset_id, ticker_data):
+        '''
+        Save ticker data into SQL ticker_data table. Input must be a Pandas DataFrame created by tvDatafeed.
+        '''
+        for index, row in ticker_data.iterrows(): # iterate over all the rows in DataFrame; OPPOSITE operation is pd.Timestamp(dt.strptime(t_string,"%Y-%m-%d %H:%M:%S"))
+            self.db_cursor.execute("INSERT INTO ticker_data VALUES(?, ?, ?, ?, ?, ?, ?, ?)", (asset_id, \
+                                                                                              str(index), \
+                                                                                              row.symbol, \
+                                                                                              row.open, \
+                                                                                              row.high, \
+                                                                                              row.low, \
+                                                                                              row.close, \
+                                                                                              row.volume))
+        
+        self.db_con.commit()
+        
     def query_insert_order(self, order_data):
         self.db_cursor.execute("INSERT INTO orders VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", order_data) # order_data must be a tuple 
         self.db_con.commit()
@@ -169,8 +194,8 @@ class sqlManager(threading.Thread):
             sql_params=data.get_sql_params()
             self.database.query_update_order(sql_params)
         elif op is operations.save_ticker_data:
-            # collect all data from packet, generate an sql_query string and save it into database
-            pass
+            # TICKER DATA IS A PANDAS OBJECT WHICH CAN CONTAIN 1 OR MANY DATA POINTS - NEED TO WRITE THEM INTO SQL ONE-BY-ONE
+            self.database.query_insert_ticker(sender, data)
         
         if sender in self.active_listen: # if the packet was from Strategy that we are actively monitoring then pass that along to the GUI
             self.output_queue.put(packet)
