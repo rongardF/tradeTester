@@ -5,7 +5,8 @@ from datetime import datetime as dt
 from tvDatafeed import Interval
 from tvDatafeed.tvDatafeedRealtime import tvDatafeedRealtime as tdr
 from livetrader.sqlManager import sqlManager
-from livetrader.testruns import testruns, testrun_data
+from livetrader.testruns import testruns, testrunData
+from livetrader.orders import orderData
 
 class controller(threading.Thread):
     '''
@@ -16,7 +17,7 @@ class controller(threading.Thread):
         '''
         Constructor
         '''
-        self.data_collector=tdr()
+        self.data_collector=tdr(True) # each new asset_id will be unique and old, removed asset sets IDs will not be re-used
         self.sql=sqlManager(sql_path) 
         self.sql_input, self.sql_output=self.sql.get_io()
         self.sql.start()
@@ -71,9 +72,9 @@ class controller(threading.Thread):
             if order[4] == "NULL":
                 stop_dt="N/A"
             else:
-                stop_dt=dt.strptime(order[4],"%d-%m-%y %H:%M")
+                stop_dt=dt.strptime(order[4],"%Y-%m-%d %H:%M:%S")
                 
-            orders_list.append(testrun_data(order[0], order[2], dt.strptime(order[3],"%d-%m-%y %H:%M"), \
+            orders_list.append(orderData(order[0], order[2], dt.strptime(order[3],"%Y-%m-%d %H:%M:%S"), \
                                               stop_dt, order[5], order[6], order[7], \
                                               order[8], order[9], order[9]))
         
@@ -89,10 +90,10 @@ class controller(threading.Thread):
             if testrun[4] == "NULL":
                 stop_dt="N/A"
             else:
-                stop_dt=dt.strptime(testrun[4],"%d-%m-%y %H:%M")
+                stop_dt=dt.strptime(testrun[4],"%Y-%m-%d %H:%M:%S")
                 
-            testruns_list.append(testrun_data(testrun[0], testrun[1], testrun[2],\
-                                              dt.strptime(testrun[3],"%d-%m-%y %H:%M"), \
+            testruns_list.append(testrunData(testrun[0], testrun[1], testrun[2],\
+                                              dt.strptime(testrun[3],"%Y-%m-%d %H:%M:%S"), \
                                               stop_dt, \
                                               testrun[5], testrun[6], self.__interval2str(testrun[7]), \
                                               testrun[8], testrun[9]))
