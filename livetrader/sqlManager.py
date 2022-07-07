@@ -77,7 +77,8 @@ class sqlDatabase(object):
                                                     close_account_size REAL, \
                                                     PRIMARY KEY(TUID, order_id))")
         
-        self.db_cursor.execute("CREATE TABLE ticker_data (asset_id INTEGER PRIMARY KEY, \
+        self.db_cursor.execute("CREATE TABLE ticker_data (ID INTEGER PRIMARY KEY, \
+                                                        asset_id INTEGER, \
                                                         datetime TEXT NOT NULL, \
                                                         symbol TEXT NOT NULL, \
                                                         open REAL NOT NULL, \
@@ -106,14 +107,14 @@ class sqlDatabase(object):
         Save ticker data into SQL ticker_data table. Input must be a Pandas DataFrame created by tvDatafeed.
         '''
         for index, row in ticker_data.iterrows(): # iterate over all the rows in DataFrame; OPPOSITE operation is pd.Timestamp(dt.strptime(t_string,"%Y-%m-%d %H:%M:%S"))
-            self.db_cursor.execute("INSERT INTO ticker_data VALUES(?, ?, ?, ?, ?, ?, ?, ?)", (asset_id, \
-                                                                                              str(index), \
-                                                                                              row.symbol, \
-                                                                                              row.open, \
-                                                                                              row.high, \
-                                                                                              row.low, \
-                                                                                              row.close, \
-                                                                                              row.volume))
+            self.db_cursor.execute("INSERT INTO ticker_data VALUES(NULL, ?, ?, ?, ?, ?, ?, ?, ?)", (asset_id, \
+                                                                                                  str(index), \
+                                                                                                  row.symbol, \
+                                                                                                  row.open, \
+                                                                                                  row.high, \
+                                                                                                  row.low, \
+                                                                                                  row.close, \
+                                                                                                  row.volume))
         
         self.db_con.commit()
         
@@ -146,6 +147,10 @@ class sqlDatabase(object):
     
     def query_delete_testrun(self, TUID):
         self.db_cursor.execute("DELETE FROM testruns WHERE TUID = (?)", (TUID,))
+        self.db_con.commit()
+        
+    def query_delete_ticker_data(self, asset_id):
+        self.db_cursor.execute("DELETE FROM ticker_data WHERE asset_id = (?)", (asset_id,))
         self.db_con.commit()
     
     def query_delete_orders(self, TUID):
@@ -249,6 +254,11 @@ class sqlManager(threading.Thread):
         self.get_lock()
         self.database.query_delete_orders(TUID)
         self.database.query_delete_testrun(TUID)
+        self.drop_lock()
+    
+    def del_ticker_data(self, asset_id):
+        self.get_lock()
+        self.database.query_delete_ticker_data(asset_id)
         self.drop_lock()
     
     def stop(self):
