@@ -5,7 +5,7 @@ from datetime import datetime as dt
 from tvDatafeed import Interval
 from tvDatafeed.tvDatafeedRealtime import tvDatafeedRealtime as tdr
 from livetrader.sqlManager import sqlManager
-from livetrader.testruns import testruns, testrunData
+from livetrader.testruns import testrunsManager, testrunData
 from livetrader.orders import orderData
 
 class controller(threading.Thread):
@@ -21,7 +21,7 @@ class controller(threading.Thread):
         self.sql=sqlManager(sql_path) 
         self.sql_input, self.sql_output=self.sql.get_io()
         self.sql.start()
-        self.testruns=testruns(self.data_collector, self.sql) 
+        self.testruns=testrunsManager(self.data_collector, self.sql) 
 
         threading.Thread.__init__(self)
         
