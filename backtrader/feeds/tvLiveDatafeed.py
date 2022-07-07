@@ -19,7 +19,7 @@ class tvLiveDatafeed(DataBase): # PARENT class is AbstractDataBase
         super().start() 
 
     def receive_data(self, data): # this function is called by the tvDatafeedRealtime whenever the symbol we use in this datafeed has a new value
-        self.data_queue.put(data) # put new data in to queue
+        self.data_queue.put(data[1]) # put new data in to queue and ignore the asset_id part
         self.newData=True # set the flag so _load() knows there is new data
     
     def remove_callback(self):

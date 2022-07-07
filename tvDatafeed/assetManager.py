@@ -52,7 +52,8 @@ class asset(object):
 
 class assetManager(object):
     
-    def __init__(self):
+    def __init__(self, unique_asset_id):
+        self.unique_asset_id=unique_asset_id # this flag sets if asset_id integer will be unique or can be re-used if any asset is removed (and so asset_id released)
         self.__assets={} # dictionary which has int as keys and asset objects as values
         self.__grouped_assets={} # dictionary which has lists as values and Interval enum as keys
         self.__update_times={} # dictionary which has datetime as value and Interval enum as keys
@@ -70,23 +71,31 @@ class assetManager(object):
         if new_asset in self.__assets.values(): # if this asset set is already among assets that we monitor 
             return list(self.__assets.keys())[list(self.__assets.values()).index(new_asset)] # then simply return the asset_id of the existing asset
         
-        for i in range(len(self.__assets)+1): # keys are integer values starting from 0, loop through all keys + 1
-            if i not in self.__assets: # if any key before the highest key has been released (deleted) then we shall use that one, otherwise we take new highest number
-                self.__assets[i]=new_asset 
-                
-                # create a new interval group in grouped assets if not already existing
-                if new_asset.interval.value not in self.__grouped_assets:
-                    self.__grouped_assets[new_asset.interval.value]=[] 
-                
-                # update the grouped asset list
-                for a in self.__assets.values():
-                    if a not in self.__grouped_assets[a.interval.value]: # if we don't already have it listed
-                        self.__grouped_assets[a.interval.value].append(a)
-                                
-                return i
+        if self.unique_asset_id: # asset IDs must be unique 
+            asset_id=len(self.__assets)+1 # so we just increment everytime
+        else:
+            for i in range(len(self.__assets)+1): # keys are integer values starting from 0, loop through all keys + 1
+                if i not in self.__assets: # if any key before the highest key has been released (deleted) then we shall use that one, otherwise we take new highest number
+                    asset_id=i
+        
+        self.__assets[asset_id]=new_asset 
+        
+        # create a new interval group in grouped assets if not already existing
+        if new_asset.interval.value not in self.__grouped_assets:
+            self.__grouped_assets[new_asset.interval.value]=[] 
+        
+        # update the grouped asset list
+        for a in self.__assets.values():
+            if a not in self.__grouped_assets[a.interval.value]: # if we don't already have it listed
+                self.__grouped_assets[a.interval.value].append(a)
+                        
+        return asset_id
     
     def get_asset(self, asset_id):
-        return self.__assets[asset_id]
+        if asset_id in self.__assets: # if this asset does not exists
+            return self.__assets[asset_id]
+        else:
+            return None
     
     def get_timeframe(self, interval):
         if interval.value in self.__update_times: # if this timeframe is in the monitor list
