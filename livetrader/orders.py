@@ -13,7 +13,7 @@ class orderData(object):
         self.stop_loss_price=stop_loss
         self.take_profit_price=take_profit
 
-class orders(object):
+class ordersManager(object):
     
     def __init__(self, TUID, order_id_starting=0): # user can specify the starting value for order_id (incase we are going from backtest to forward test)
         self.order_id=order_id_starting
