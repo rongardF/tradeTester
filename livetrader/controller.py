@@ -61,6 +61,24 @@ class controller(threading.Thread):
             return self.inter2str[interval]
         else:
             raise ValueError("No such interval")
+    
+    def get_ticker_data(self, TUID):
+        '''
+        Retrieve ticker data. TUID specifies the testrun from which we get asset_id.
+        
+        Ticker data is returned in list of DataFrames
+        '''
+        ticker_data_list=[]
+        
+        sql_testruns=self.sql.read_testruns()
+        for testrun in sql_testruns:
+            if testrun[0] == TUID: # this is the testrun for which we want ticker data
+                asset_id=self.testruns.get_testrun(testrun[0]).get_asset_id() # get asset_id by retrieving testrun from testrunsManager and getting its asset_id attribute
+                break
+        
+        ticker_data_list.append(self.sql.read_ticker_data(asset_id)) # LIST IS USED BECAUSE IN THE FUTURE WE WILL IMPLEMENT ONE TESTRUN USING MULTIPLE ASSETS
+        
+        return ticker_data_list
         
     def get_orders(self, TUID):
         '''
