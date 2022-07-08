@@ -1,5 +1,4 @@
 '''
-Test the new stuff out
 '''
 
 from datetime import datetime as dt
