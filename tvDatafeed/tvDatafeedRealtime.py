@@ -98,9 +98,9 @@ class tvDatafeedRealtime():
         asset_id=self.__am.add_asset(symbol, exchange, interval)
         in_list=self.__am.get_timeframe(interval) # get the next update time for this interval
         if in_list is None: # None if we are not monitoring this interval yet
-            data=self.__tv_datafeed.get_hist(symbol,exchange,n_bars=1,interval=interval) # get 1-bar data for this symbol and interval
+            data=self.__tv_datafeed.get_hist(symbol,exchange,n_bars=2,interval=interval) # get 1-bar data for this symbol and interval
             self.__am.add_timeframe(interval, data.index.to_pydatetime()[0]) # add this datetime into list of timeframes we monitor; to_pydatetime converts into list of datetime objects
-        
+            
         self.__am.drop_lock() 
         
         if self.__main_thread is None: # if main thread is not running then start (might have not yet started or might have closed when all asset sets were removed)
@@ -138,7 +138,8 @@ class tvDatafeedRealtime():
             for asset in self.__am.get_grouped_assets(inter): # go through all the assets in this interval group 
                 retry_counter=0 # keep track of how many tries so we give up at some point
                 while True:
-                    data=self.__tv_datafeed.get_hist(asset.symbol,asset.exchange,n_bars=1,interval=asset.interval) # get the latest data bar for this asset
+                    data=self.__tv_datafeed.get_hist(asset.symbol,asset.exchange,n_bars=2,interval=asset.interval) # get the latest data bar for this asset
+                    data=data.drop(labels=data.index[1], axis=0) # drop the row which has un-closed bar data
                     
                     # if the retrieved samples datetime does not equal the old datetime then it is new sample, otherwise try again
                     if asset.get_updated_value() != data.index.to_pydatetime()[0]:

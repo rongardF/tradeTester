@@ -92,9 +92,9 @@ class assetManager(object):
         return asset_id
     
     def get_asset(self, asset_id):
-        if asset_id in self.__assets: # if this asset does not exists
+        if asset_id in self.__assets: 
             return self.__assets[asset_id]
-        else:
+        else: # if this asset does not exists
             return None
     
     def get_timeframe(self, interval):
