@@ -32,7 +32,7 @@ class MyStrategy(bt.Strategy):
 
     def next(self):
         if self.order: # if order already created then close it
-            raise ValueError("TEST")
+            #raise ValueError("TEST")
             self.order.close_order(str(dt.now().strftime("%Y-%m-%d %H:%M:%S")), self.data.close[0], 10000.0)
             pack=packet(operations.close_order, self.order.TUID, self.order)
             self.p.sql_input.put(pack)
@@ -76,5 +76,6 @@ if __name__ == "__main__":
     print("Thread started, waiting...")
     time.sleep(130)
     print("Stopping testrun 1...")
-    contr.stop_testrun(tuid1)
+    print(contr.get_ticker_data(tuid1))
+    #contr.stop_testrun(tuid1)
     time.sleep(300)

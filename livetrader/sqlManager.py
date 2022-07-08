@@ -4,6 +4,7 @@
 import sqlite3, threading, queue
 from datetime import datetime as dt
 from enum import Enum
+import pandas as pd
 
 class operations(Enum):
     open_order=1
@@ -145,6 +146,27 @@ class sqlDatabase(object):
         self.db_cursor.execute("SELECT * FROM testruns")
         return self.db_cursor.fetchall()
     
+    def query_read_ticker_data(self, asset_id):
+        '''
+        Retrieve all ticker data from SQL based on asset_id. Ticker data will be provided in Pandas DataFrame
+        '''
+        ticker_data=pd.DataFrame() # create empty dataframe where we will put data
+        ticker_data.index.name="datetime"
+        
+        self.db_cursor.execute("SELECT * FROM ticker_data WHERE asset_id = ?",(asset_id,)) # retrieve all ticker data for this asset_id
+        data_tuples_list=self.db_cursor.fetchall()
+        
+        for data_tuple in data_tuples_list:
+            ticker_data=pd.concat([ticker_data,pd.DataFrame(data={"symbol" : data_tuple[3], \
+                                                                    "open" : data_tuple[4], \
+                                                                    "high" : data_tuple[5], \
+                                                                    "low" : data_tuple[6], \
+                                                                    "close" : data_tuple[7], \
+                                                                    "volume" : data_tuple[8]}, \
+                                                                    index=[data_tuple[2]])]) # index/datetime column
+                
+        return ticker_data
+        
     def query_delete_testrun(self, TUID):
         self.db_cursor.execute("DELETE FROM testruns WHERE TUID = (?)", (TUID,))
         self.db_con.commit()
@@ -231,6 +253,9 @@ class sqlManager(threading.Thread):
     
     # write this as a direct method called by controller
     def read_testruns(self): # this function returns all the orders which are newly added
+        '''
+        Return a list of tuples. Each tuple is a testrun (entry) that is registered in SQL database.
+        '''
         self.get_lock()
         testruns=self.database.query_read_testruns()
         self.drop_lock()
@@ -244,6 +269,12 @@ class sqlManager(threading.Thread):
         self.drop_lock()
         return orders
     
+    def read_ticker_data(self, asset_id):
+        self.get_lock()
+        ticker_data=self.database.query_read_ticker_data(asset_id)
+        self.drop_lock()
+        return ticker_data
+        
     # write this as a direct method called by controller
     def set_streamer(self, TUID, asset_id):
         self.get_lock() # as thread might be running at the same time then lock the resource before continuing
