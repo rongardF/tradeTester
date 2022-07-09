@@ -11,6 +11,12 @@ from livetrader.orders import ordersManager
 from livetrader.sqlManager import operations, packet
 from livetrader.controller import controller
 
+from backtrader.feeds.tvLiveDatafeed import tvLiveDatafeed as tld
+from tvDatafeed import Interval
+from tvDatafeed.tvDatafeedRealtime import tvDatafeedRealtime as tdr
+from tvDatafeed import TvDatafeed
+import backtrader.feeds as btfeeds
+
 def terminal(queue):
     while True:
         pack=queue.get()
@@ -18,6 +24,15 @@ def terminal(queue):
         order=pack.get_data()
         if pack.get_operation() != operations.save_ticker_data:
             print("Order "+order.state+" with entry price "+str(order.entry_price)+" and close price "+str(order.close_price))
+
+class testStrategy(bt.Strategy):
+    
+    def __init__(self):
+        pass
+    
+    def next(self):
+        print("Close price of 3 minute interval: "+str(self.datas[0].lines.close[0]))
+        print("Close price of 5 minutes interval: "+str(self.datas[1].lines.close[0]))
 
 # this strategy opens and closes orders in sequence to test the tradeTester
 class MyStrategy(bt.Strategy):
@@ -65,17 +80,32 @@ class MyStrategy1(bt.Strategy):
             self.p.sql_input.put(pack)
 
 if __name__ == "__main__":
-    contr=controller(r"C:\Users\User\Documents\Projektid\Python\tradeTester\development_materials\test_db.db")
-    #contr.start()
-    tuid1=contr.start_testrun("myTest", MyStrategy, "ETHUSDT", "KUCOIN", "1 minute", 10000) # strategy name must be unique and orders for that testrun must be removed from DB before running
-    tuid2=contr.start_testrun("myTest", MyStrategy1, "ETHUSDT", "KUCOIN", "1 minute", 10000)
-    tuid3=contr.start_testrun("myTest", MyStrategy1, "ETHUSDT", "KUCOIN", "3 minutes", 10000)
-    contr.select_testrun(tuid1)
-    t=threading.Thread(target=terminal, args=(contr.sql_output,))
-    t.start()
-    print("Thread started, waiting...")
-    time.sleep(130)
-    print("Stopping testrun 1...")
-    print(contr.get_ticker_data(tuid1))
-    #contr.stop_testrun(tuid1)
-    time.sleep(300)
+    # contr=controller(r"C:\Users\User\Documents\Projektid\Python\tradeTester\development_materials\test_db.db")
+    # #contr.start()
+    # tuid1=contr.start_testrun("myTest", MyStrategy, "ETHUSDT", "KUCOIN", "1 minute", 10000) # strategy name must be unique and orders for that testrun must be removed from DB before running
+    # tuid2=contr.start_testrun("myTest", MyStrategy1, "ETHUSDT", "KUCOIN", "1 minute", 10000)
+    # tuid3=contr.start_testrun("myTest", MyStrategy1, "ETHUSDT", "KUCOIN", "3 minutes", 10000)
+    # contr.select_testrun(tuid1)
+    # t=threading.Thread(target=terminal, args=(contr.sql_output,))
+    # t.start()
+    # print("Thread started, waiting...")
+    # time.sleep(130)
+    # print("Stopping testrun 1...")
+    # print(contr.get_ticker_data(tuid1))
+    # #contr.stop_testrun(tuid1)
+    # time.sleep(300)
+    
+    datafeeds_list=[]
+    data_collector=tdr(True)
+    
+    asset_id1=data_collector.add_symbol("ETHUSDT", "KUCOIN", Interval.in_3_minute)
+    asset_id2=data_collector.add_symbol("ETHUSDT", "KUCOIN", Interval.in_5_minute)
+    
+    datafeeds_list.append(tld(data_collector, asset_id1))
+    datafeeds_list.append(tld(data_collector, asset_id2))
+    
+    cerebro = bt.Cerebro()
+    cerebro.addstrategy(testStrategy)
+    for feed in datafeeds_list: # add all data feeds to cerebro, each needs to be added with separate call to adddata() method
+        cerebro.adddata(feed) 
+    cerebro.run()
