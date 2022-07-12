@@ -8,6 +8,78 @@ from livetrader.sqlManager import sqlManager
 from livetrader.testruns import testrunsManager, testrunData
 from livetrader.orders import orderData
 
+class asset_set(object):
+    
+    def __init__(self, symbol=None, exchange=None, intervals=[]): # intervals must be a list of objects
+        self.symbol=symbol
+        self.exchange=exchange
+        self.intervals=intervals
+    
+    def set_symbol(self, symbol):
+        '''
+        Set the symbol for this asset, input is string. Old value will be overvwritten
+        '''
+        self.symbol=symbol
+    
+    def get_symbol(self):
+        '''
+        Get the asset symbol
+        '''
+        return self.symbol
+    
+    def set_exchange(self, exchange):
+        '''
+        Set the exhcange/market where this symbol is traded
+        '''
+        self.exchange=exchange
+    
+    def get_exchange(self):
+        '''
+        Get the exchange/market for this symbol
+        '''
+        return self.exchange
+    
+    def add_interval(self, interval):
+        '''
+        Add another timeframe for this symbol. This class will contain a list of timeframes (bars) for this symbol
+        '''
+        self.intervals.append(interval)
+    
+    def get_intervals_string(self):
+        '''
+        Return a list of intervals as a string.
+        '''
+        list_str=""
+        for inter in self.intervals:
+            list_str=list_str+" "+str(inter)
+        
+        return list_str
+    
+    def __iter__(self): 
+        '''
+        Iter method to return iterator and also reset all iteration related attributes
+        '''
+        self.asset_sets=[] # get a list of all testruns
+        for inter in self.intervals:
+            asset_set=[self.symbol, self.exchange, inter]
+            self.asset_sets.append(asset_set)
+            
+        self.iter_index=0 # reset  list index
+        self.iter_stop=len(self.asset_sets) # set stopping value
+        return self
+    
+    def __next__(self):
+        '''
+        Next method to iterate over all asset_sets (combinations with Interval) - return will be a list of [symbol, exchange, interval]
+        '''
+        if self.iter_index >= self.iter_stop:
+            raise StopIteration
+        else:
+            iter_val=self.asset_sets[self.iter_index]
+            self.iter_index+=1 # increment index
+            return iter_val
+    
+    
 class controller(threading.Thread):
     '''
     classdocs
@@ -50,17 +122,12 @@ class controller(threading.Thread):
         print("Exception from "+str(TUID))
         traceback.print_exception(e)
     
-    def __str2interval(self, inter_str):
-        if inter_str in self.str2inter:
-            return self.str2inter[inter_str]
-        else:
-            raise ValueError("No such interval string")
-        
-    def __interval2str(self, interval):
-        if interval in self.inter2str:
-            return self.inter2str[interval]
-        else:
-            raise ValueError("No such interval")
+    def strToIntervals(self, inter_str):
+        intervals=[]
+        for inter in inter_str.split():
+            intervals.append(eval(inter))
+            
+        return intervals
     
     def get_ticker_data(self, TUID):
         '''
@@ -73,10 +140,11 @@ class controller(threading.Thread):
         sql_testruns=self.sql.read_testruns()
         for testrun in sql_testruns:
             if testrun[0] == TUID: # this is the testrun for which we want ticker data
-                asset_id=self.testruns.get_testrun(testrun[0]).get_asset_id() # get asset_id by retrieving testrun from testrunsManager and getting its asset_id attribute
-                break
+                asset_aid=self.testruns.get_testrun(testrun[0]).get_asset_aid() # get asset_aid by retrieving testrun from testrunsManager and getting its asset_id attribute
+                break 
         
-        ticker_data_list.append(self.sql.read_ticker_data(asset_id)) # LIST IS USED BECAUSE IN THE FUTURE WE WILL IMPLEMENT ONE TESTRUN USING MULTIPLE ASSETS
+        for asset_id in asset_aid:
+            ticker_data_list.append(self.sql.read_ticker_data(asset_id)) # get ticker data (DataFrame) and put it into list of Pandas DataFrames 
         
         return ticker_data_list
         
@@ -105,7 +173,7 @@ class controller(threading.Thread):
         testruns_list=[]
         testruns=self.sql.read_testruns()
         for testrun in testruns:
-            if testrun[4] == "NULL":
+            if testrun[4] == "NULL": # if testrun is not closed then we don't have close datetime
                 stop_dt="N/A"
             else:
                 stop_dt=dt.strptime(testrun[4],"%Y-%m-%d %H:%M:%S")
@@ -113,16 +181,16 @@ class controller(threading.Thread):
             testruns_list.append(testrunData(testrun[0], testrun[1], testrun[2],\
                                               dt.strptime(testrun[3],"%Y-%m-%d %H:%M:%S"), \
                                               stop_dt, \
-                                              testrun[5], testrun[6], self.__interval2str(testrun[7]), \
+                                              testrun[5], testrun[6], self.strToIntervals(testrun[7]), \
                                               testrun[8], testrun[9]))
         
         return testruns_list
     
-    def start_testrun(self, testrun_name, strategy, symbol, exchange, interval, account_size):
+    def start_testrun(self, testrun_name, strategy, asset, account_size):
         '''
         Start a new testrun with provided strategy
         '''
-        TUID=self.testruns.new_testrun(testrun_name, strategy, symbol, exchange, self.__str2interval(interval), account_size, self.exception_handler)
+        TUID=self.testruns.new_testrun(testrun_name, strategy, asset, account_size, self.exception_handler)
         return TUID
     
     def stop_testrun(self, TUID):
@@ -149,5 +217,5 @@ class controller(threading.Thread):
         '''
         Configure which testrun data is propagated to GUI
         '''
-        asset_id=self.testruns.get_testrun(TUID).asset_id # get the asset_id for this testrun based on TUID
-        self.sql.set_streamer(TUID, asset_id) # data for ths TUID and asset_id must be propagated to GUI
+        asset_aid=self.testruns.get_testrun(TUID).get_asset_aid() # get the asset_id for this testrun based on TUID
+        self.sql.set_streamer(TUID, asset_aid) # data for ths TUID and asset_id must be propagated to GUI
