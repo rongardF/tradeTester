@@ -1,9 +1,4 @@
 '''
-CONTINUE:
-Study how Cerebro works with differnt data sets and how to access those different data sets
-
-Each live feed is a separate data object - for multiple assets(intervals) we need to create multiple separate live feeds and feed them into cerebro.
-The live feed object itself should not change, but the startegyRunner should change to create separate livefeeds based on asset_ids
 '''
 
 import queue
