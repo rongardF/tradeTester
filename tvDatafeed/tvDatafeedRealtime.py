@@ -74,8 +74,9 @@ class tvDatafeedRealtime():
         
         self.__callback_threads = {} # this holds reference to all the callback threads running, key values will be queue object references
         self.__main_thread = None # this variable is used for referencing the main thread running collect_data_loop
-        self.__shutdown=threading.Event() # this will be used to close the collect_data_loop thread
-    
+        self.__interrupt=threading.Event() # this will be used to close the collect_data_loop thread
+        self.__interrupt.shutdown=False # by default the interrupt reason is not shutdown
+        
     def add_symbol(self, symbol, exchange, interval, timeout=-1):
         '''
         Add a symbol on a specific exchange with specific interval into 
@@ -98,14 +99,21 @@ class tvDatafeedRealtime():
         asset_id=self.__am.add_asset(symbol, exchange, interval)
         in_list=self.__am.get_timeframe(interval) # get the next update time for this interval
         if in_list is None: # None if we are not monitoring this interval yet
-            data=self.__tv_datafeed.get_hist(symbol,exchange,n_bars=2,interval=interval) # get 1-bar data for this symbol and interval
+            data=self.__tv_datafeed.get_hist(symbol,exchange,n_bars=2,interval=interval) # get data for this symbol and interval
             self.__am.add_timeframe(interval, data.index.to_pydatetime()[0]) # add this datetime into list of timeframes we monitor; to_pydatetime converts into list of datetime objects
             
+            # check if new __timeout_datetime value would be shorter than the current one that we might be waiting upon
+            if self.__timeout_datetime is None:
+                pass # we don't have any timeout yet so simply do nothing
+            elif self.__timeout_datetime > self.__am.get_timeout_dt(): # if new timeout would be sooner
+                self.__interrupt.set() # interrupt the waiting to set the new timeout value for waiting statement
+        
         self.__am.drop_lock() 
         
         if self.__main_thread is None: # if main thread is not running then start (might have not yet started or might have closed when all asset sets were removed)
-            self.__shutdown.clear() # reset shutdown flag
-            self.__main_thread = threading.Thread(target=self.__collect_data_loop, args=(self.__shutdown,))
+            self.__interrupt.shutdown=False
+            self.__interrupt.clear() # reset shutdown flag, don't need lock because nothing is running at this point
+            self.__main_thread = threading.Thread(target=self.__collect_data_loop, args=(self.__interrupt,))
             self.__main_thread.start() 
         
         return asset_id
@@ -121,13 +129,14 @@ class tvDatafeedRealtime():
             queue.put("EXIT") # send exit signal to thread
         self.__am.del_asset(asset_id) # delete the asset itself
         if self.__am.is_empty():
-            self.__shutdown.set() # signal the __collect_data and main loop that they should close
+            self.__interrupt.shutdown=True
+            self.__interrupt.set() # signal the __collect_data and main loop that they should close
         self.__am.drop_lock()
         
-    def __collect_data(self, shutdown):
+    def __collect_data(self, interrupt):
         if self.__timeout_datetime is not None:
             wait_time=self.__timeout_datetime-dt.now() # calculate the time in seconds to next timeout
-            if shutdown.wait(wait_time.total_seconds()): # if we received an event during waiting then it will return True
+            if interrupt.wait(wait_time.total_seconds()) and interrupt.shutdown: # if we received an event during waiting then it will return True
                 raise RuntimeError() # raise an exception so we'll exit the while loop and close the thread
             
         self.__am.get_lock() # we will not time out, but wait however long necessary
@@ -139,24 +148,28 @@ class tvDatafeedRealtime():
                 retry_counter=0 # keep track of how many tries so we give up at some point
                 while True:
                     data=self.__tv_datafeed.get_hist(asset.symbol,asset.exchange,n_bars=2,interval=asset.interval) # get the latest data bar for this asset
+                    if data is None:
+                        raise ValueError("Retrieved None from tvDatafeed get_hist method")
                     data=data.drop(labels=data.index[1], axis=0) # drop the row which has un-closed bar data
                     
                     # if the retrieved samples datetime does not equal the old datetime then it is new sample, otherwise try again
                     if asset.get_updated_value() != data.index.to_pydatetime()[0]:
                         asset.set_updated_value(data.index.to_pydatetime()[0]) # update the datetime of the last sample
                         break
-                    elif retry_counter >= 100: # if more than 100 times we get old data then abort (50s)
+                    elif retry_counter >= 50: # if more than 100 times we get old data then abort (50s)
                         raise ValueError("Failed to retrieve new data from TradingView")
                     
-                    time.sleep(0.5)
+                    time.sleep(0.1)
+                    retry_counter+=1
                     
-                    if shutdown.is_set(): # check if shutdown has been signaled 
+                    if interrupt.is_set()  and interrupt.shutdown: # check if shutdown has been signaled 
                         raise RuntimeError() # raise an exception so we'll exit the while loop and close the thread
                 
                 # put this new data into all the queues for all the callback function threads that are expecting this data sample
                 for queue in asset.get_callback_queues():
                     queue.put(data)
         
+        interrupt.clear() # in case we were interrupted, but not to shutdown then we can reset this event for next loop
         self.__am.drop_lock() 
     
     def __callback_thread(self, callback_function, queue, asset_id):
@@ -210,13 +223,10 @@ class tvDatafeedRealtime():
         q.put("EXIT") # send the exit signal to that thread
         self.__callback_threads.pop(q) # remove the thread reference from the dictionary
         
-    def __collect_data_loop(self, shutdown):
+    def __collect_data_loop(self, interrupt):
         try: 
-            while not shutdown.is_set(): # loop this function in this thread until shutdown signal received
-                self.__collect_data(shutdown)
-                # if self.__timeout_datetime is None: # if None after running collect_data then no asset sets added and we will stop thread because nothing to do
-                #     self.__main_thread = None # clear this reference because this thread will be closed
-                #     return 
+            while True: # while loop will be broken by exceptions
+                self.__collect_data(interrupt)
         except RuntimeError: # this is expected if shutdown signal was sent
             if self.__am.islocked():
                 self.__am.drop_lock() # release the lock so in case something is blocked because of this
@@ -229,7 +239,10 @@ class tvDatafeedRealtime():
         
     def __del__(self):
         # make sure that all threads are stopped
-        self.__shutdown.set()
+        self.__am.get_lock() # need to get lock first because interrupt_flag (__shutdown) is acessed by many threads
+        self.__interrupt.shutdown=True
+        self.__interrupt.set()
+        self.__am.drop_lock()
         self.__main_thread.join() # wait until all threads are closed down
     
     def stop(self):

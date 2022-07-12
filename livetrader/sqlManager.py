@@ -276,9 +276,9 @@ class sqlManager(threading.Thread):
         return ticker_data
         
     # write this as a direct method called by controller
-    def set_streamer(self, TUID, asset_id):
+    def set_streamer(self, TUID, asset_aid):
         self.get_lock() # as thread might be running at the same time then lock the resource before continuing
-        self.active_listen=[TUID, asset_id] # save the TUID for which testrun we are actively forwarding (streaming) order (and in future ticker) data
+        self.active_listen=[TUID, asset_aid.get_ids()] # save the TUID for which testrun we are actively forwarding (streaming) order (and in future ticker) data
         self.drop_lock()
     
     def del_testrun(self, TUID):
