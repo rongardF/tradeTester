@@ -136,7 +136,7 @@ class assetManager(object):
         timeframes_updated=[] # this list will contain interval enum values for which new data is available
         dt_now=dt.now()
         for inter, dt_next_update in self.__update_times.items(): # go through all the interval/timeframes for which we have assets to monitor
-            if dt_now >= dt_next_update: # if present time is greater than the time when next sample should become available
+            if dt_now >= dt_next_update: # if present time is greater than the time when next sample should become available; or if dt_next_update is None
                 self.__update_times[inter] = dt_next_update + self.__timeframes[inter] # change the time to next update datetime (result will be datetime object)
                 timeframes_updated.append(inter)
         
