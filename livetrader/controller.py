@@ -17,224 +17,130 @@
 #
 ###############################################################################
 
-import threading
-import traceback
+import threading, traceback
 
 from datetime import datetime as dt
 from tvDatafeed import Interval
-from tvDatafeed.tvDatafeedRealtime import tvDatafeedRealtime as tdr
+from tvDatafeed import TvDatafeedLive
 from livetrader.sqlManager import sqlManager
 from livetrader.testruns import testrunsManager, testrunData
 from livetrader.orders import orderData
+from livetrader.testrun import Testrun
 
-class asset_set(object):
-    
-    def __init__(self, symbol=None, exchange=None, intervals=[]): # intervals must be a list of objects
+class asset(object):
+    '''
+    Holds symbol, exchange and list of Interval objects
+    which together allow to define some number of Seis
+    objects with various intervals, but same symbol and exchange
+    values
+    '''
+    def __init__(self, symbol=None, exchange=None, intervals=[]): # intervals must be a list of Interval objects
         self.symbol=symbol
         self.exchange=exchange
         self.intervals=intervals
-    
-    def set_symbol(self, symbol):
-        '''
-        Set the symbol for this asset, input is string. Old value will be overvwritten
-        '''
-        self.symbol=symbol
-    
-    def get_symbol(self):
-        '''
-        Get the asset symbol
-        '''
-        return self.symbol
-    
-    def set_exchange(self, exchange):
-        '''
-        Set the exhcange/market where this symbol is traded
-        '''
-        self.exchange=exchange
-    
-    def get_exchange(self):
-        '''
-        Get the exchange/market for this symbol
-        '''
-        return self.exchange
-    
-    def add_interval(self, interval):
-        '''
-        Add another timeframe for this symbol. This class will contain a list of timeframes (bars) for this symbol
-        '''
-        self.intervals.append(interval)
-    
-    def get_intervals_string(self):
-        '''
-        Return a list of intervals as a string.
-        '''
-        list_str=""
-        for inter in self.intervals:
-            list_str=list_str+" "+str(inter)
-        
-        return list_str
+        self.valid=False
+        self.invalid_pairs=[]
     
     def __iter__(self): 
-        '''
-        Iter method to return iterator and also reset all iteration related attributes
-        '''
-        self.asset_sets=[] # get a list of all testruns
-        for inter in self.intervals:
-            asset_set=[self.symbol, self.exchange, inter]
-            self.asset_sets.append(asset_set)
-            
-        self.iter_index=0 # reset  list index
-        self.iter_stop=len(self.asset_sets) # set stopping value
+        self.intervals_iter=iter(self.intervals)
         return self
     
     def __next__(self):
-        '''
-        Next method to iterate over all asset_sets (combinations with Interval) - return will be a list of [symbol, exchange, interval]
-        '''
-        if self.iter_index >= self.iter_stop:
-            raise StopIteration
-        else:
-            iter_val=self.asset_sets[self.iter_index]
-            self.iter_index+=1 # increment index
-            return iter_val
+        interval=next(self.intervals_iter)
+        return self.symbol, self.exchange, interval
     
-    
-class controller(threading.Thread):
+class Controller():
     '''
     classdocs
     '''
 
-    def __init__(self, sql_path):
+    def __init__(self, sql_path=None):
         '''
         Constructor
         '''
-        self.data_collector=tdr(True) # each new asset_id will be unique and old, removed asset sets IDs will not be re-used
+        self.tv_datafeed_live=TvDatafeedLive() 
         self.sql=sqlManager(sql_path) 
-        self.sql_input, self.sql_output=self.sql.get_io()
         self.sql.start()
-        self.testruns=testrunsManager(self.data_collector, self.sql) 
-
-        threading.Thread.__init__(self)
-        
-        self.str2inter={"1 minute":Interval.in_1_minute, "3 minutes":Interval.in_3_minute, \
-                        "5 minutes":Interval.in_5_minute, "15 minutes":Interval.in_15_minute, \
-                        "30 minutes":Interval.in_30_minute, "45 minutes":Interval.in_45_minute, \
-                         "1 hour":Interval.in_1_hour, "2 hours":Interval.in_2_hour, "3 hours":Interval.in_3_hour, \
-                         "4 hours":Interval.in_4_hour, "1 day":Interval.in_daily, "1 week":Interval.in_weekly, \
-                         "1 month":Interval.in_monthly}
-        
-        self.inter2str={"Interval.in_1_minute":"1 minute","Interval.in_3_minute":"3 minutes", \
-                        "Interval.in_5_minute":"5 minutes", "Interval.in_15_minute":"15 minutes", \
-                        "Interval.in_30_minute":"30 minutes", "Interval.in_45_minute":"45 minutes", \
-                        "Interval.in_1_hour":"1 hour", "Interval.in_2_hour":"2 hours", "Interval.in_3_hour":"3 hours", \
-                        "Interval.in_4_hour":"4 hours", "Interval.in_daily":"1 day", "Interval.in_weekly":"1 week", \
-                        "Interval.in_monthly":"1 month"}
-        
-    def run(self):
-        while True:
-            pass
+        self.testruns={}
     
-    def exception_handler(self, e, TUID):
+    def ranking(self): # TODO: currently just return unordered list of testruns, but in future this method should accept metrics names that should be used for ordering
+        '''
+        Return a list of all testruns in ranked order
+        '''
+        raise NotImplementedError
+    
+    def graph(self, tuid):
+        '''
+        Plot the testrun with all data colected so far
+        '''
+        raise NotImplementedError
+    
+    def info(self, tuid):
+        '''
+        Return info about testrun from testruns table
+        '''
+        raise NotImplementedError
+    
+    def orders(self, tuid):
+        '''
+        Return all orders for this testrun
+        '''
+        raise NotImplementedError
+        
+    def is_valid(self, asset):
+        '''
+        Check that provided symbol-exchange pairs are valid
+        '''
+        for symbol, exchange, _ in asset:
+            if not self.tdl.search_symbol(symbol, exchange): # if empty list is returned then invalid
+                asset.invalid_pairs.append(f"{symbol}:{exchange}")
+        
+        # if no invalid pairs then all valid
+        if not asset.invalid_pairs:
+            asset.valid=True
+            
+        return asset 
+    
+    def _collect_price_data(self, seis, package):
+        package.livetrader_data_id=seis.livetrader_data_id
+        self.sql.put(package)
+    
+    def _exception_handler(self, e, tuid): # TODO: add information about thrown exception into SQL database as well
         '''
         Handle exceptions that might have been thrown in any of the testruns
         '''
-        print("Exception from "+str(TUID))
+        print("Exception from "+str(tuid))
         traceback.print_exception(e)
     
-    def strToIntervals(self, inter_str):
-        intervals=[]
-        for inter in inter_str.split():
-            intervals.append(eval(inter))
-            
-        return intervals
-    
-    def get_ticker_data(self, TUID):
-        '''
-        Retrieve ticker data. TUID specifies the testrun from which we get asset_id.
-        
-        Ticker data is returned in list of DataFrames
-        '''
-        ticker_data_list=[]
-        
-        sql_testruns=self.sql.read_testruns()
-        for testrun in sql_testruns:
-            if testrun[0] == TUID: # this is the testrun for which we want ticker data
-                asset_aid=self.testruns.get_testrun(testrun[0]).get_asset_aid() # get asset_aid by retrieving testrun from testrunsManager and getting its asset_id attribute
-                break 
-        
-        for asset_id in asset_aid:
-            ticker_data_list.append(self.sql.read_ticker_data(asset_id)) # get ticker data (DataFrame) and put it into list of Pandas DataFrames 
-        
-        return ticker_data_list
-        
-    def get_orders(self, TUID):
-        '''
-        Return a list of order_data objects for all the orders for this particular testrun (TUID)
-        '''
-        orders_list=[]
-        orders=self.sql.read_orders(TUID)
-        for order in orders:
-            if order[4] == "NULL":
-                stop_dt="N/A"
-            else:
-                stop_dt=dt.strptime(order[4],"%Y-%m-%d %H:%M:%S")
-                
-            orders_list.append(orderData(order[0], order[2], dt.strptime(order[3],"%Y-%m-%d %H:%M:%S"), \
-                                              stop_dt, order[5], order[6], order[7], \
-                                              order[8], order[9], order[9]))
-        
-        return orders_list
-    
-    def get_testruns(self):
-        '''
-        Return a list of testrun_data objects for all the testruns in database (running and stopped) 
-        '''
-        testruns_list=[]
-        testruns=self.sql.read_testruns()
-        for testrun in testruns:
-            if testrun[4] == "NULL": # if testrun is not closed then we don't have close datetime
-                stop_dt="N/A"
-            else:
-                stop_dt=dt.strptime(testrun[4],"%Y-%m-%d %H:%M:%S")
-                
-            testruns_list.append(testrunData(testrun[0], testrun[1], testrun[2],\
-                                              dt.strptime(testrun[3],"%Y-%m-%d %H:%M:%S"), \
-                                              stop_dt, \
-                                              testrun[5], testrun[6], self.strToIntervals(testrun[7]), \
-                                              testrun[8], testrun[9]))
-        
-        return testruns_list
-    
-    def start_testrun(self, testrun_name, strategy, asset, account_size):
+    def new_testrun(self, name, strategy, asset, settings): # account size does not actually matter if we want to only see if strat is net positive/negative, but it has to be big enough to consider strategies specifics
         '''
         Start a new testrun with provided strategy
         '''
-        TUID=self.testruns.new_testrun(testrun_name, strategy, asset, account_size, self.exception_handler)
-        return TUID
+        seises=[]
+        for symbol, exchange, interval in asset:
+            seis=self.tv_datafeed_live.new_seis(symbol, exchange, interval) 
+            seis.livetrader_data_id=self.sql.add_data(seis) # create new attribute in Seis which helps to map to specific data in datas table
+            seis.new_consumer(self._collect_price_data) # consumer that sends price action data to SQL       
+            seises.append(seis)
+            
+        tuid=self.sql.add_testrun(name, strategy, seises, settings.account_size, settings.broker_comm) # add testrun into SQL database and get TUID; TODO: SQLite should also have a callback to error_handled in case there is any exception thrown related to some testrun
+        testrun=Testrun(tuid, seises, self.sql, strategy.strategy_class, self._exception_handler) 
+        testrun.start() # start the strategy in that testrun
+        
+        self.testruns[tuid]=testrun
     
-    def stop_testrun(self, TUID):
+    def stop_testrun(self, tuid):
         '''
         Stop strategy from running
         '''
-        if self.testruns.get_testrun(TUID) is not None: # check first that such a testrun exists
-            self.testruns.close_testrun(TUID) # get the testrun object
+        if tuid in self.testruns: # check first that such a testrun exists
+            self.testruns[tuid].close() 
+        else:
+            raise ValueError("No testrun with such TUID value")
     
     def stop_all_testruns(self):
         '''
         Stop all strategies from running - this is called before closing down tradeTester application
         '''
-        self.testruns.close_all_testruns()
-    
-    def del_testrun(self, TUID):
-        '''
-        Remove testrun from the list and all related data
-        '''
-        self.stop_testrun(TUID) # first stop the testrun from running
-        self.testruns.del_testrun(TUID)
-    
-    def select_testrun(self, TUID):
-        '''
-        Configure which testrun data is propagated to GUI
-        '''
-        asset_aid=self.testruns.get_testrun(TUID).get_asset_aid() # get the asset_id for this testrun based on TUID
-        self.sql.set_streamer(TUID, asset_aid) # data for ths TUID and asset_id must be propagated to GUI
+        for testrun in self.testruns:
+            testrun.close()

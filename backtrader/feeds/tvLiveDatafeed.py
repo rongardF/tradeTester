@@ -23,25 +23,28 @@ from backtrader.feeds import DataBase
 
 class tvLiveDatafeed(DataBase): # PARENT class is AbstractDataBase
 
-    def __init__(self, tv_datafeed_realtime, asset_id):
-        self.tdr=tv_datafeed_realtime
-        self.callback_id=self.tdr.add_callback(asset_id, self.receive_data) # add callback method for this asset set; keep callback id so later we can remove it
+    def __init__(self, seis):
+        self.seis=seis
+        self.consumer=self.seis.new_consumer(self.receive_data) 
         self.data_queue=queue.Queue() # queue where all the new data is put for the _load() method to process
         
     def start(self):
         super().start() 
 
-    def receive_data(self, data): # this function is called by the tvDatafeedRealtime whenever the symbol we use in this datafeed has a new value
-        self.data_queue.put(data[1]) # put new data in to queue and ignore the asset_id part
+    def receive_data(self, _, data): # ignore seis argument (second argument provided when called)
+        '''
+        Method called by consumer thread whenever new data available
+        '''
+        self.data_queue.put(data)
     
     def remove_callback(self):
-        self.tdr.del_callback(self.callback_id)
+        self.consumer.del_consumer()
 
     def _load(self):  # this is called inside the load() method in AbstractDataBase and will actually assign data to lines
         if not self.data_queue.empty(): # if there is new data in the queue
             data=self.data_queue.get() # get next available data bar
-            if isinstance(data,str): # if string is received then that is "EXIT"
-                return False # means user stopped this strategy
+            if data is None: # means user stopped this strategy
+                return False # False stops the cerebro
             
             # add new data together with its datetime into lines
             self.lines.datetime[0] = date2num(data.index[0])
