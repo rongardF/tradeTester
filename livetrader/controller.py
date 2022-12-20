@@ -22,17 +22,24 @@ import threading, traceback
 from datetime import datetime as dt
 from tvDatafeed import Interval
 from tvDatafeed import TvDatafeedLive
-from livetrader.sqlManager import sqlManager
-from livetrader.testruns import testrunsManager, testrunData
-from livetrader.orders import orderData
+from livetrader.sql_manager import SqlManager
 from livetrader.testrun import Testrun
+from livetrader.strategy import Strategy
+from backtrader import strategy
 
 class asset(object):
     '''
+    Symbol, exchange, intervals group 
+    
     Holds symbol, exchange and list of Interval objects
     which together allow to define some number of Seis
     objects with various intervals, but same symbol and exchange
-    values
+    values.
+    
+    The instance of this object is False until it has been validated
+    with is_valid method which returns True. If that method returns
+    false the invalid_pairs attribute will contain symbol-exchange 
+    pairs which are not valid
     '''
     def __init__(self, symbol=None, exchange=None, intervals=[]): # intervals must be a list of Interval objects
         self.symbol=symbol
@@ -40,6 +47,12 @@ class asset(object):
         self.intervals=intervals
         self.valid=False
         self.invalid_pairs=[]
+    
+    def __bool__(self):
+        return self.valid
+    
+    def __len__(self):
+        return len(self.intervals)
     
     def __iter__(self): 
         self.intervals_iter=iter(self.intervals)
@@ -59,7 +72,7 @@ class Controller():
         Constructor
         '''
         self.tv_datafeed_live=TvDatafeedLive() 
-        self.sql=sqlManager(sql_path) 
+        self.sql=SqlManager(sql_path) 
         self.sql.start()
         self.testruns={}
     
@@ -71,7 +84,7 @@ class Controller():
     
     def graph(self, tuid):
         '''
-        Plot the testrun with all data colected so far
+        Plot the testrun with all data collected so far
         '''
         raise NotImplementedError
     
@@ -90,6 +103,19 @@ class Controller():
     def is_valid(self, asset):
         '''
         Check that provided symbol-exchange pairs are valid
+        
+        If method returns False the invalid symbol-exchange pairs
+        are given in the invalid_pairs attribute of the asset
+        
+        Parameters
+        ----------
+        asset : asset
+            Asset to be checked
+            
+        Returns
+        -------
+        boolean
+            True if valid, False otherwise
         '''
         for symbol, exchange, _ in asset:
             if not self.tdl.search_symbol(symbol, exchange): # if empty list is returned then invalid
@@ -99,7 +125,7 @@ class Controller():
         if not asset.invalid_pairs:
             asset.valid=True
             
-        return asset 
+        return asset.valid 
     
     def _collect_price_data(self, seis, package):
         package.livetrader_data_id=seis.livetrader_data_id
@@ -112,10 +138,21 @@ class Controller():
         print("Exception from "+str(tuid))
         traceback.print_exception(e)
     
-    def new_testrun(self, name, strategy, asset, settings): # account size does not actually matter if we want to only see if strat is net positive/negative, but it has to be big enough to consider strategies specifics
+    def new_testrun(self, name, input_strategy, asset, settings): # account size does not actually matter if we want to only see if strat is net positive/negative, but it has to be big enough to consider strategies specifics
         '''
         Start a new testrun with provided strategy
         '''
+        # check the asset and strategy
+        if not self.is_valid(asset): # not valid
+            print_statement=""
+            for pair in asset.invalid_pairs: print_statement+f"\n{pair}"
+            raise ValueError(f"Provided symbol-exchange pairs are not valid: {print_statement}")
+        else:
+            strategy=Strategy(input_strategy, len(asset))
+            if not strategy.validate(): # validate strategy, if returns False
+                traceback.print_exception(ValueError(f"Strategy {input_strategy.__name__} threw and exception:\n"))
+                raise strategy.exception
+            
         seises=[]
         for symbol, exchange, interval in asset:
             seis=self.tv_datafeed_live.new_seis(symbol, exchange, interval) 
@@ -124,10 +161,10 @@ class Controller():
             seises.append(seis)
             
         tuid=self.sql.add_testrun(name, strategy, seises, settings.account_size, settings.broker_comm) # add testrun into SQL database and get TUID; TODO: SQLite should also have a callback to error_handled in case there is any exception thrown related to some testrun
-        testrun=Testrun(tuid, seises, self.sql, strategy.strategy_class, self._exception_handler) 
+        testrun=Testrun(tuid, seises, self.sql, strategy.strategy, self._exception_handler) 
         testrun.start() # start the strategy in that testrun
         
-        self.testruns[tuid]=testrun
+        self.testruns[(name, tuid)]=testrun
     
     def stop_testrun(self, tuid):
         '''
