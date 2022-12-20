@@ -1,15 +1,15 @@
 
 # SQLite3 statements used to create the ER schematics tables
-sql_tables_statements=["CREATE TABLE modules (module_id INTEGER PRIMARY KEY, type INTEGER NOT NULL, blob_hash INTEGER NOT NULL, file BLOB NOT NULL)", \
-                       "CREATE TABLE testruns (tuid INTEGER PRIMARY KEY, name TEXT NOT NULL, start_datetime TEXT NOT NULL, end_datetime TEXT, start_account REAL NOT NULL, end_account REAL, broker_commission REAL NOT NULL, module_id INTEGER NOT NULL, FOREIGN KEY(module_id) REFERENCES modules(module_id))", \
+sql_tables_statements=["CREATE TABLE modules (module_id INTEGER PRIMARY KEY, type INTEGER NOT NULL, hash TEXT NOT NULL, file BLOB NOT NULL)", \
                        "CREATE TABLE indicators (indicator_id INTEGER PRIMARY KEY, indicator_name TEXT NOT NULL, module_id INTEGER NOT NULL, FOREIGN KEY(module_id) REFERENCES modules(module_id))", \
-                       "CREATE TABLE sub_indicators_list (id INTEGER PRIMARY KEY, indicator_id INTEGER NOT NULL, sub_indicator_list_id INTEGER NOT NULL, FOREIGN KEY(indicator_id) REFERENCES indicators(indicator_id), FOREIGN KEY(sub_indicator_list_id) REFERENCES indicators(indicator_id))", \
-                       "CREATE TABLE testrun_indicators (testrun_indicator_id INTEGER PRIMARY KEY, indicator_id INTEGER NOT NULL, tuid INTEGER NOT NULL, testrun_indicator_name TEXT NOT NULL, FOREIGN KEY(indicator_id) REFERENCES indicators(indicator_id), FOREIGN KEY(tuid) REFERENCES testruns(tuid))", \
+                       "CREATE TABLE sub_indicators_list (id INTEGER PRIMARY KEY, indicator_id TEXT NOT NULL, sub_indicator_id INTEGER NOT NULL, FOREIGN KEY(indicator_id) REFERENCES indicators(indicator_id), FOREIGN KEY(sub_indicator_id) REFERENCES indicators(indicator_id))", \
+                       "CREATE TABLE testruns (tuid INTEGER PRIMARY KEY, name TEXT NOT NULL, start_datetime TEXT NOT NULL, end_datetime TEXT, start_account REAL NOT NULL, end_account REAL, broker_commission REAL NOT NULL, module_id INTEGER NOT NULL, FOREIGN KEY(module_id) REFERENCES modules(module_id))", \
+                       "CREATE TABLE testrun_indicators (testrun_indicator_id INTEGER PRIMARY KEY, indicator_id INTEGER NOT NULL, tuid INTEGER NOT NULL, testrun_indicator_name TEXT NOT NULL,  FOREIGN KEY(indicator_id) REFERENCES indicators(indicator_id), FOREIGN KEY(tuid) REFERENCES testruns(tuid))", \
                        "CREATE TABLE indicator_lines (line_id INTEGER PRIMARY KEY, testrun_indicator_id INTEGER NOT NULL, line_name TEXT NOT NULL, FOREIGN KEY(testrun_indicator_id) REFERENCES testrun_indicators(testrun_indicator_id))", \
                        "CREATE TABLE lines_values (value_id INTEGER PRIMARY KEY, line_id INTEGER NOT NULL, dt TEXT NOT NULL, value REAL NOT NULL, FOREIGN KEY(line_id) REFERENCES indicator_lines(line_id))", \
-                       "CREATE TABLE lines_plotinfo (line_id INTEGER PRIMARY KEY, plotskip INTEGER NOT NULL, plotvalue INTEGER NOT NULL, plotvaluetag INTEGER NOT NULL, name TEXT, skipnan INTEGER NOT NULL, samecolor INTEGER NOT NULL, method TEXT NOT NULL, other_line_id INTEGER, other_line_value REAL, color TEXT NOT NULL, transparency REAL , FOREIGN KEY(line_id) REFERENCES indicator_lines(line_id), FOREIGN KEY(other_line_id) REFERENCES indicator_lines(line_id))", \
-                       "CREATE TABLE datas (data_id INTEGER PRIMARY KEY, symbol TEXT NOT NULL, exchange TEXT NOT NULL, interval INTEGER NOT NULL)", \
-                       "CREATE TABLE testrun_indicators_plotinfo (testrun_indicator_id INTEGER PRIMARY KEY, plot INTEGER NOT NULL, subplot INTEGER NOT NULL, plotname TEXT, plotabove INTEGER NOT NULL, plotlinelabels INTEGER NOT NULL, plotlinevalues INTEGER NOT NULL, plotvaluetags INTEGER NOT NULL, plotymargin REAL NOT NULL, plotylimited INTEGER NOT NULL, plotmaster_data_id INTEGER, FOREIGN KEY(testrun_indicator_id) REFERENCES testrun_indicators(testrun_indicator_id), FOREIGN KEY(plotmaster_data_id) REFERENCES datas(data_id))",
+                       "CREATE TABLE plotlines_data (id INTEGER PRIMARY KEY, line_id INTEGER NOT NULL, attr_name TEXT NOT NULL, attr_value_str TEXT NOT NULL)", \
+                       "CREATE TABLE datas (data_id INTEGER PRIMARY KEY, symbol TEXT NOT NULL, exchange TEXT NOT NULL, interval TEXT NOT NULL)", \
+                       "CREATE TABLE testrun_indicators_plotinfo (testrun_indicator_id INTEGER PRIMARY KEY, plot INTEGER NOT NULL, subplot INTEGER NOT NULL, plotname TEXT, plotabove INTEGER NOT NULL, plotlinelabels INTEGER NOT NULL, plotlinevalues INTEGER NOT NULL, plotvaluetags INTEGER NOT NULL, plotymargin REAL NOT NULL, plotmaster_data_id INTEGER, FOREIGN KEY(testrun_indicator_id) REFERENCES testrun_indicators(testrun_indicator_id), FOREIGN KEY(plotmaster_data_id) REFERENCES datas(data_id))",
                        "CREATE TABLE plothlines_lists (id INTEGER PRIMARY KEY, plothlines_list_id INTEGER NOT NULL, value REAL NOT NULL, FOREIGN KEY(plothlines_list_id) REFERENCES testrun_indicators_plotinfo(testrun_indicator_id))", \
                        "CREATE TABLE plotyticks_lists (id INTEGER PRIMARY KEY, plotyticks_list_id INTEGER NOT NULL, value REAL NOT NULL, FOREIGN KEY(plotyticks_list_id) REFERENCES testrun_indicators_plotinfo(testrun_indicator_id))", \
                        "CREATE TABLE plotyhlines_lists (id INTEGER PRIMARY KEY, plotyhlines_list_id INTEGER NOT NULL, value REAL NOT NULL, FOREIGN KEY(plotyhlines_list_id) REFERENCES testrun_indicators_plotinfo(testrun_indicator_id))", \
@@ -23,9 +23,23 @@ sql_tables_statements=["CREATE TABLE modules (module_id INTEGER PRIMARY KEY, typ
 sql_insert_testrun_statement="INSERT INTO testruns VALUES(NULL, ?, ?, NULL, ?, NULL, ?, ?)"
 sql_insert_data="INSERT INTO datas VALUES(NULL, ?, ?, ?)"
 sql_insert_testrun_datas="INSERT INTO testrun_datas_list VALUES(NULL, ?, ?)"
-sql_insert_module="INSERT INTO modules VALUES(NULL, ?, ?)"
+sql_insert_module="INSERT INTO modules VALUES(NULL, ?, ?, ?)"
 sql_insert_bar="INSERT INTO bars VALUES(NULL, ?, ?, ?, ?, ?, ?, ?)"
+sql_insert_indicator="INSERT INTO indicators VALUES(NULL, ?, ?)"
+sql_insert_sub_indicator="INSERT INTO sub_indicators_list VALUES(NULL, ?, ?)"
+sql_insert_testrun_indicator="INSERT INTO testrun_indicators VALUES(NULL, ?, ?, ?)"
+sql_insert_indicator_line="INSERT INTO indicator_lines VALUES(NULL, ?, ?)"
+sql_insert_plotlines_data="INSERT INTO plotlines_data VALUES(NULL, ?, ?, ?)"
+sql_insert_testrun_indicators_plotinfo="INSERT INTO testrun_indicators_plotinfo VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+sql_insert_plothlines_lists="INSERT INTO plothlines_lists VALUES(NULL, ?, ?)"
+sql_insert_plotyticks_lists="INSERT INTO plotyticks_lists VALUES(NULL, ?, ?)"
+sql_insert_plotyhlines_lists="INSERT INTO plotyhlines_lists VALUES(NULL, ?, ?)"
 
 # SELECT statements
-sql_select_data="SELECT * FROM datas WHERE symbol=? AND exchange=? AND interval=?"
-sql_select_module_hash="SELECT * FROM datas WHERE hash=?"
+#sql_select_data="SELECT * FROM datas WHERE symbol=? AND exchange=? AND interval=?"
+sql_select_datas="SELECT * FROM datas"
+#sql_select_module_hash="SELECT * FROM modules WHERE hash=?"
+sql_select_modules="SELECT hash, module_id FROM modules"
+sql_select_indicators_all="SELECT * FROM indicators"
+sql_select_indicator_hashes="SELECT module_id, hash FROM indicators WHERE type=1"
+sql_select_indicators="SELECT hash, indicator_id, indicator_name FROM indicators LEFT JOIN modules ON indicators.module_id=modules.module_id"
